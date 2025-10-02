@@ -1,0 +1,71 @@
+version: "3"
+
+dotenv:
+  - .env
+
+vars:
+  KUBECONFIG: "--kubeconfig {{.KUBECONFIG_FILE}}"
+  ACK_SYSTEM_NAMESPACE: ack-system
+  AWS_REGION: eu-west-1
+  OCI_REPO: oci://public.ecr.aws/aws-controllers-k8s
+  ACCOUNT_ID: "074597098702"
+  CLUSTER: rav-test-eks1
+  ACK_CONTROLLER_IAM_ROLE: RavACKIAMControllerRole
+
+
+
+tasks:
+  install-eks-pod-identity-agent:
+    silent: true
+    dir: "research/eks-pod-identity-agent/charts/eks-pod-identity-agent"
+    cmds:
+      - helm upgrade --install -n kube-system {{.KUBECONFIG}} eks-pid-agent .
+
+  uninstall-eks-pod-identity-agent:
+    silent: true
+    dir: "research/eks-pod-identity-agent/charts/eks-pod-identity-agent"
+    cmds:
+      - helm uninstall -n kube-system {{.KUBECONFIG}} eks-pid-agent
+
+  install-ack-iam-controller:
+    silent: false
+    cmds:
+      - helm upgrade --install --create-namespace -n {{.ACK_SYSTEM_NAMESPACE}} {{.KUBECONFIG}} -f config/iam-controller/values.yaml --version=1.5.1 --set=aws.region={{.AWS_REGION}} ack-iam-controller {{.OCI_REPO}}/iam-chart
+
+  uninstall-ack-iam-controller:
+    silent: true
+    cmds:
+      - helm uninstall {{.KUBECONFIG}} -n {{.ACK_SYSTEM_NAMESPACE}} ack-iam-controller
+
+  irsa_ack_iam:
+    silent: false
+    cmds:
+      - aws iam create-role --profile mcm-dev --role-name "{{.ACK_CONTROLLER_IAM_ROLE}}" --assume-role-policy-document file://config/iam-controller/trust.json
+      - aws iam get-role --profile mcm-dev --role-name={{.ACK_CONTROLLER_IAM_ROLE}} --query Role.Arn --output text
+      - aws iam put-role-policy --profile mcm-dev --role-name "{{.ACK_CONTROLLER_IAM_ROLE}}" --policy-name "ack-recommended-policy" --policy-document "file://config/iam-controller/inline-policy.json"
+
+  associate_pod_id_ack_iam:
+    silent: false
+    cmds:
+      # - aws iam create-role --role-name RavACKIAMControllerRole --assume-role-policy-document file://config/policy/trust-policy.json --profile mcm-dev
+      - aws eks create-pod-identity-association --profile mcm-dev --cluster-name {{.CLUSTER}} --namespace {{.ACK_SYSTEM_NAMESPACE}} --service-account ack-iam-controller --role-arn arn:aws:iam::{{.ACCOUNT_ID}}:role/RavACKIAMControllerRole
+
+  login-ecr-public-repo:
+    silent: true
+    cmds:
+      - aws ecr-public get-login-password --region us-east-1 --profile mcm-staging | helm registry login --username AWS --password-stdin public.ecr.aws
+
+  get-ack-service-version:
+    silent: true
+    cmds:
+      - curl -sL https://api.github.com/repos/aws-controllers-k8s/{{.CLI_ARGS}}-controller/releases/latest | jq -r '.tag_name | ltrimstr("v")'
+
+  get-oidc-provider:
+    silent: true
+    cmds:
+      - aws eks describe-cluster --name {{.CLUSTER}} --region {{.AWS_REGION}} --profile mcm-dev --query "cluster.identity.oidc.issuer" --output text | sed -e "s/^https:\/\///"
+
+  get-k8s-nodes:
+    silent: true
+    cmds:
+      - kubectl get nodes {{.KUBECONFIG}}
