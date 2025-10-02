@@ -1,0 +1,7 @@
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  name: ack-eks-controller
+  annotations:
+    eks.amazonaws.com/role-arn:  arn:aws:iam::074597098702:role/RavACKEKSControllerRole

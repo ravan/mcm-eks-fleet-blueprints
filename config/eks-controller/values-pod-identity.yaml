@@ -1,0 +1,7 @@
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  name: ack-eks-controller
+  # No IRSA annotation for Pod Identity - authentication handled by EKS Pod Identity Agent
+  annotations: {}
