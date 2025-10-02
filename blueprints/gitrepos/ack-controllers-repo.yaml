@@ -1,0 +1,27 @@
+kind: GitRepo
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: ack-controllers
+  namespace: fleet-default
+spec:
+  # Repository URL - update this to your actual repository URL
+  repo: https://github.com/ravan/mcm-eks-fleet-blueprints
+
+  # Branch to track
+  branch: main
+
+  # Paths to monitor in the repository
+  # Each path will become a separate bundle with proper dependencies
+  paths:
+    - blueprints/ack-eks-controller
+    - blueprints/ack-iam-controller
+
+  # Polling interval - how often Fleet checks for changes
+  pollingInterval: 60s
+
+  # Target all EKS clusters
+  targets:
+    - name: eks-clusters
+      clusterSelector:
+        matchLabels:
+          cluster-type: eks

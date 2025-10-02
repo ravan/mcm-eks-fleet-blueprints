@@ -5,6 +5,7 @@ dotenv:
 
 vars:
   KUBECONFIG: "--kubeconfig {{.KUBECONFIG_FILE}}"
+  KUBECONFIG_RANCHER: "--kubeconfig {{.KUBECONFIG_RANCHER_FILE}}"
   ACK_SYSTEM_NAMESPACE: ack-system
   AWS_REGION: eu-west-1
   OCI_REPO: oci://public.ecr.aws/aws-controllers-k8s
@@ -12,8 +13,9 @@ vars:
   CLUSTER: rav-test-eks1
   ACK_CONTROLLER_IAM_ROLE: RavACKIAMControllerRole
   ACK_CONTROLLER_EKS_ROLE: RavACKEKSControllerRole
-
-
+  ACKEKSControllerRoleArn: arn:aws:iam::{{.ACCOUNT_ID}}:role/MCMACKEKSControllerRole
+  FleetBootstrapRoleArn: arn:aws:iam::{{.ACCOUNT_ID}}:role/MCMACKFleetBootstrapRole
+  ACKIAMControllerRoleArn: arn:aws:iam::{{.ACCOUNT_ID}}:role/MCMACKIAMControllerRole"
 
 tasks:
   install-eks-pod-identity-agent:
@@ -116,6 +118,71 @@ tasks:
         OIDC_ARN="arn:aws:iam::{{.ACCOUNT_ID}}:oidc-provider/oidc.eks.{{.AWS_REGION}}.amazonaws.com/id/$OIDC_ID"
         echo "Deleting OIDC provider: $OIDC_ARN"
         aws iam delete-open-id-connect-provider --open-id-connect-provider-arn "$OIDC_ARN" --profile mcm-dev || echo "OIDC provider already deleted or not found"
+
+  cloudformation-run-ack-controller-roles:
+    silent: true
+    dir: cloudformation
+    cmds:
+      - aws cloudformation create-stack --stack-name ack-controllers-roles --template-body file://ack-controllers-roles.yaml --capabilities CAPABILITY_NAMED_IAM --profile mcm-dev
+      - aws cloudformation wait stack-create-complete --stack-name ack-controllers-roles --profile mcm-dev
+      - aws cloudformation describe-stacks --stack-name ack-controllers-roles  --query 'Stacks[0].Outputs' --profile mcm-dev
+
+  fleet-bootstrap-initial-pod-identitiy-for-target-cluster:
+    silent: true
+    cmds:
+      - ./scripts/bootstrap-cluster.sh --cluster-name {{.CLUSTER}} --role-arn {{.FleetBootstrapRoleArn}} --region {{.AWS_REGION}} --profile mcm-dev
+
+  fleet-cleanup-pod-identities:
+    desc: "Delete all pod identity associations created by bootstrap process"
+    silent: true
+    cmds:
+      - |
+        echo "Cleaning up pod identity associations for cluster: {{.CLUSTER}}"
+
+        # Delete fleet-bootstrap pod identity association
+        echo "Looking for fleet-bootstrap pod identity association..."
+        FLEET_BOOTSTRAP_ASSOC=$(aws eks list-pod-identity-associations --profile mcm-dev --cluster-name {{.CLUSTER}} --namespace cattle-fleet-system --service-account fleet-bootstrap --query 'associations[0].associationId' --output text 2>/dev/null || echo "")
+        if [ -n "$FLEET_BOOTSTRAP_ASSOC" ] && [ "$FLEET_BOOTSTRAP_ASSOC" != "None" ]; then
+          echo "Deleting fleet-bootstrap association: $FLEET_BOOTSTRAP_ASSOC"
+          aws eks delete-pod-identity-association --profile mcm-dev --cluster-name {{.CLUSTER}} --association-id "$FLEET_BOOTSTRAP_ASSOC"
+        else
+          echo "No fleet-bootstrap association found"
+        fi
+
+        # Delete ACK EKS controller pod identity association
+        echo "Looking for ACK EKS controller pod identity association..."
+        ACK_EKS_ASSOC=$(aws eks list-pod-identity-associations --profile mcm-dev --cluster-name {{.CLUSTER}} --namespace {{.ACK_SYSTEM_NAMESPACE}} --service-account ack-eks-controller --query 'associations[0].associationId' --output text 2>/dev/null || echo "")
+        if [ -n "$ACK_EKS_ASSOC" ] && [ "$ACK_EKS_ASSOC" != "None" ]; then
+          echo "Deleting ACK EKS controller association: $ACK_EKS_ASSOC"
+          aws eks delete-pod-identity-association --profile mcm-dev --cluster-name {{.CLUSTER}} --association-id "$ACK_EKS_ASSOC"
+        else
+          echo "No ACK EKS controller association found"
+        fi
+
+        # Delete ACK IAM controller pod identity association
+        echo "Looking for ACK IAM controller pod identity association..."
+        ACK_IAM_ASSOC=$(aws eks list-pod-identity-associations --profile mcm-dev --cluster-name {{.CLUSTER}} --namespace {{.ACK_SYSTEM_NAMESPACE}} --service-account ack-iam-controller --query 'associations[0].associationId' --output text 2>/dev/null || echo "")
+        if [ -n "$ACK_IAM_ASSOC" ] && [ "$ACK_IAM_ASSOC" != "None" ]; then
+          echo "Deleting ACK IAM controller association: $ACK_IAM_ASSOC"
+          aws eks delete-pod-identity-association --profile mcm-dev --cluster-name {{.CLUSTER}} --association-id "$ACK_IAM_ASSOC"
+        else
+          echo "No ACK IAM controller association found"
+        fi
+
+        echo "Pod identity cleanup complete"
+
+  fleet-define-gitrepo-apply:
+    silent: true
+    cmds:
+      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/cluster-groups/all-eks-clusters.yaml
+      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/pod-identity-agent-repo.yaml
+      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-controllers-repo.yaml
+  
+  fleet-reset-gitrepo-definitions:
+    silent: true
+    cmds:
+      - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/pod-identity-agent-repo.yaml
+      - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-controllers-repo.yaml
 
   login-ecr-public-repo:
     silent: true

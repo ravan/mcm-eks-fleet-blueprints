@@ -1,0 +1,140 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fleet-bootstrap
+  namespace: cattle-fleet-system
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fleet-bootstrap-role
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+rules:
+  - apiGroups: ["eks.services.k8s.aws"]
+    resources: ["podidentityassociations"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fleet-bootstrap-binding
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fleet-bootstrap-role
+subjects:
+  - kind: ServiceAccount
+    name: fleet-bootstrap
+    namespace: cattle-fleet-system
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: cattle-fleet-system
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: bootstrap
+spec:
+  backoffLimit: {{ .Values.bootstrap.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.bootstrap.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      serviceAccountName: fleet-bootstrap
+      restartPolicy: Never
+      containers:
+      - name: bootstrap
+        image: alpine/k8s:1.34.1
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+
+            echo "=== ACK IAM Controller Bootstrap ==="
+            echo "Creating PodIdentityAssociation CRD..."
+
+            CLUSTER_NAME="{{ .Values.clusterName }}"
+            ROLE_ARN="arn:aws:iam::{{ .Values.awsAccountId }}:role/{{ .Values.ackIamRoleName }}"
+            NAMESPACE="{{ .Release.Namespace }}"
+            SERVICE_ACCOUNT="ack-iam-controller"
+            RESOURCE_NAME="ack-iam-controller-pod-identity"
+
+            if [ -z "$CLUSTER_NAME" ] || [ -z "$ROLE_ARN" ]; then
+              echo "ERROR: CLUSTER_NAME and ROLE_ARN must be set"
+              exit 1
+            fi
+
+            echo "Cluster: $CLUSTER_NAME"
+            echo "Role ARN: $ROLE_ARN"
+            echo "Namespace: $NAMESPACE"
+            echo "Service Account: $SERVICE_ACCOUNT"
+
+            # Create PodIdentityAssociation CRD
+            cat <<EOF | kubectl apply -f -
+            apiVersion: eks.services.k8s.aws/v1alpha1
+            kind: PodIdentityAssociation
+            metadata:
+              name: $RESOURCE_NAME
+              namespace: $NAMESPACE
+            spec:
+              clusterName: $CLUSTER_NAME
+              namespace: $NAMESPACE
+              serviceAccount: $SERVICE_ACCOUNT
+              roleARN: $ROLE_ARN
+            EOF
+
+            echo "✓ PodIdentityAssociation CRD created"
+            echo "Waiting for ACK EKS controller to reconcile the CRD..."
+
+            # Wait for the CRD to be reconciled by checking status
+            MAX_ATTEMPTS=60
+            ATTEMPT=0
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+
+              # Check if status.ackResourceMetadata.arn exists (indicates successful reconciliation)
+              ARN=$(kubectl get podidentityassociation $RESOURCE_NAME -n $NAMESPACE \
+                -o jsonpath='{.status.ackResourceMetadata.arn}' 2>/dev/null || echo "")
+
+              if [ -n "$ARN" ]; then
+                echo "✓ PodIdentityAssociation reconciled successfully!"
+                echo "Association ARN: $ARN"
+                break
+              fi
+
+              if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: CRD not yet reconciled, waiting 5 seconds..."
+                sleep 5
+              else
+                echo "ERROR: CRD was not reconciled after $MAX_ATTEMPTS attempts"
+                echo "Current status:"
+                kubectl get podidentityassociation $RESOURCE_NAME -n $NAMESPACE -o yaml || true
+                exit 1
+              fi
+            done
+
+            # Wait for credentials to propagate to EKS pod identity agent
+            echo "Waiting 10 seconds for credentials to propagate..."
+            sleep 10
+            echo "✓ Bootstrap complete. Controller deployment can now start."
+        env:
+          - name: AWS_DEFAULT_REGION
+            value: {{ .Values.awsRegion | quote }}

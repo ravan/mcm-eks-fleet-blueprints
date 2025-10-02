@@ -4,9 +4,9 @@
 namespace: kube-system
 
 helm:
-  # Use the Helm chart directly from the GitHub repository
-  # Fleet will download and deploy the chart from this location
-  chart: https://github.com/aws/eks-pod-identity-agent/archive/refs/heads/main.tar.gz//charts/eks-pod-identity-agent
+  # Use the Helm chart directly from the GitHub repository using go-getter git URL format
+  # Fleet will clone the repo and navigate to the charts/eks-pod-identity-agent subdirectory
+  chart: git::https://github.com/aws/eks-pod-identity-agent.git//charts/eks-pod-identity-agent?ref=main
 
   # Release name for the Helm deployment
   releaseName: eks-pid-agent
@@ -23,14 +23,13 @@ helm:
 targetCustomizations:
   # Dynamically set cluster-specific values using Fleet's cluster label variables
   # Assumes clusters have labels: cluster-name=<eks-cluster-name> and aws-region=<region>
-  - name: default
+  - name: eks-clusters
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks
     helm:
       values:
-        # Reference cluster labels via Fleet's global variables
-        # Format: global.fleet.clusterLabels.LABELNAME
-        clusterName: "${global.fleet.clusterLabels.cluster-name}"
+        # Reference cluster labels via Fleet's template variables
+        clusterName: ${ index .ClusterLabels "cluster-name" }
         env:
-          AWS_REGION: "${global.fleet.clusterLabels.aws-region}"
-
-    # Match all clusters in the cluster group
-    clusterGroup: all-eks-clusters
+          AWS_REGION: ${ index .ClusterLabels "aws-region" }

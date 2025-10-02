@@ -1,0 +1,36 @@
+# Fleet configuration for ACK EKS Controller with Pod Identity
+# Uses wrapper Helm chart that includes the ACK EKS controller as a subchart
+# The bootstrap Job (in separate bundle) creates the pod identity association before this deploys
+
+defaultNamespace: ack-system
+
+helm:
+  # Use local wrapper Helm chart
+  chart: ./chart
+  releaseName: ack-eks-controller
+
+# Per-cluster customizations
+targetCustomizations:
+  - name: eks-clusters
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks
+    helm:
+      values:
+        # Inject cluster-specific values from Fleet cluster labels
+        clusterName: ${ index .ClusterLabels "cluster-name" }
+        awsRegion: ${ index .ClusterLabels "aws-region" }
+        awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
+        ackEksRoleName: ${ default "MCMACKEKSControllerRole" (get .ClusterLabels "ack-eks-role-name") }
+
+        # Pass region to the eks-chart subchart
+        eks-chart:
+          aws:
+            region: ${ index .ClusterLabels "aws-region" }
+
+# Dependencies: Requires Pod Identity Agent to be running
+dependsOn:
+  - name: eks-pod-identity-agent-blueprints-pod-identity-agent
+
+# Wait for bootstrap Job to complete before deploying controller
+waitForJobs: true
