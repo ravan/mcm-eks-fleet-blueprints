@@ -1,0 +1,27 @@
+kind: GitRepo
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: eks-pod-identity-agent
+  namespace: fleet-default
+spec:
+  # Repository URL - update this to your actual repository URL
+  # This should point to where you'll host this blueprints repository
+  repo: https://github.com/ravan/mcm-eks-fleet-blueprints
+
+  # Branch to track
+  branch: main
+
+  # Paths to monitor in the repository
+  # Fleet will scan this path for fleet.yaml and deploy bundles accordingly
+  paths:
+    - blueprints/pod-identity-agent
+
+  # Polling interval - how often Fleet checks for changes
+  # Default is 15s, increase if you want less frequent polling
+  pollingInterval: 60s
+
+  # Target clusters for deployment
+  # Deploy to all clusters in the all-eks-clusters ClusterGroup
+  targets:
+    - name: all-eks
+      clusterGroup: all-eks-clusters

@@ -1,0 +1,36 @@
+# Fleet configuration for EKS Pod Identity Agent deployment
+# Deploys to kube-system namespace on all downstream EKS clusters
+
+namespace: kube-system
+
+helm:
+  # Use the Helm chart directly from the GitHub repository
+  # Fleet will download and deploy the chart from this location
+  chart: https://github.com/aws/eks-pod-identity-agent/archive/refs/heads/main.tar.gz//charts/eks-pod-identity-agent
+
+  # Release name for the Helm deployment
+  releaseName: eks-pid-agent
+
+  # Default values applied to all clusters
+  values:
+    # Default values - these will be overridden by targetCustomizations per cluster
+    clusterName: "PLACEHOLDER"
+    env:
+      AWS_REGION: "us-east-1"
+
+# Per-cluster customizations
+# Fleet will set cluster-specific values based on cluster labels
+targetCustomizations:
+  # Dynamically set cluster-specific values using Fleet's cluster label variables
+  # Assumes clusters have labels: cluster-name=<eks-cluster-name> and aws-region=<region>
+  - name: default
+    helm:
+      values:
+        # Reference cluster labels via Fleet's global variables
+        # Format: global.fleet.clusterLabels.LABELNAME
+        clusterName: "${global.fleet.clusterLabels.cluster-name}"
+        env:
+          AWS_REGION: "${global.fleet.clusterLabels.aws-region}"
+
+    # Match all clusters in the cluster group
+    clusterGroup: all-eks-clusters

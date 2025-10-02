@@ -1,0 +1,12 @@
+kind: ClusterGroup
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: all-eks-clusters
+  namespace: fleet-default
+spec:
+  # Match all downstream EKS clusters
+  # Assumes clusters are labeled with cluster-type: eks
+  # You can adjust the selector based on your cluster labeling strategy
+  selector:
+    matchLabels:
+      cluster-type: eks
