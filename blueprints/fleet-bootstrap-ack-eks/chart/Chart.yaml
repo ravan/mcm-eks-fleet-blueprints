@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fleet-bootstrap-ack-eks
+description: Bootstrap job to create pod identity association for ACK EKS controller
+type: application
+version: 1.0.0
+appVersion: "1.0"

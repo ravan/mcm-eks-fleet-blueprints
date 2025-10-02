@@ -1,0 +1,14 @@
+# Default values for fleet-bootstrap-ack-eks
+# These will be overridden by Fleet's targetCustomizations
+
+clusterName: "placeholder"
+awsRegion: "us-east-1"
+awsAccountId: "000000000000"
+ackEksRoleArn: "placeholder"
+
+# Bootstrap job configuration
+job:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400  # Keep job for 24 hours after completion
+  serviceAccount: fleet-bootstrap
+  namespace: fleet-system

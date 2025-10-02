@@ -5,8 +5,13 @@ metadata:
   namespace: fleet-default
 spec:
   # Match all downstream EKS clusters
-  # Assumes clusters are labeled with cluster-type: eks
-  # You can adjust the selector based on your cluster labeling strategy
+  # Required labels on clusters:
+  #   - cluster-type: eks
+  #   - cluster-name: <eks-cluster-name>
+  #   - aws-region: <aws-region> (e.g., us-east-1)
+  #   - aws-account-id: <account-id> (e.g., 074597098702)
+  #   - ack-eks-role-name: <role-name> (e.g., ACKEKSControllerRole)
+  #   - ack-iam-role-name: <role-name> (e.g., ACKIAMControllerRole)
   selector:
     matchLabels:
       cluster-type: eks

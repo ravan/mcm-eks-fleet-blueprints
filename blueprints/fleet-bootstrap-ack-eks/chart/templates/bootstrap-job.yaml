@@ -1,0 +1,92 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-ack-eks-pod-identity
+  namespace: {{ .Values.job.namespace }}
+  annotations:
+    description: "Bootstrap job to create pod identity association for ACK EKS controller"
+spec:
+  template:
+    metadata:
+      labels:
+        app: fleet-bootstrap
+        component: ack-eks-pod-identity
+    spec:
+      serviceAccountName: {{ .Values.job.serviceAccount }}
+      restartPolicy: OnFailure
+      containers:
+      - name: create-pod-identity
+        image: amazon/aws-cli:latest
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+
+            echo "Creating pod identity association for ACK EKS controller..."
+
+            # Get values from Helm-injected environment variables
+            CLUSTER_NAME="${CLUSTER_NAME}"
+            ROLE_ARN="${ACK_EKS_CONTROLLER_ROLE_ARN}"
+
+            if [ -z "$CLUSTER_NAME" ] || [ -z "$ROLE_ARN" ]; then
+              echo "ERROR: CLUSTER_NAME and ACK_EKS_CONTROLLER_ROLE_ARN must be set"
+              exit 1
+            fi
+
+            echo "Cluster: $CLUSTER_NAME"
+            echo "Role ARN: $ROLE_ARN"
+
+            # Check if association already exists
+            EXISTING_ASSOC=$(aws eks list-pod-identity-associations \
+              --cluster-name "$CLUSTER_NAME" \
+              --namespace ack-system \
+              --service-account ack-eks-controller \
+              --query 'associations[0].associationId' \
+              --output text 2>/dev/null || echo "")
+
+            if [ -n "$EXISTING_ASSOC" ] && [ "$EXISTING_ASSOC" != "None" ]; then
+              echo "Pod identity association already exists: $EXISTING_ASSOC"
+              echo "Verifying it points to the correct role..."
+
+              EXISTING_ROLE=$(aws eks describe-pod-identity-association \
+                --cluster-name "$CLUSTER_NAME" \
+                --association-id "$EXISTING_ASSOC" \
+                --query 'association.roleArn' \
+                --output text)
+
+              if [ "$EXISTING_ROLE" = "$ROLE_ARN" ]; then
+                echo "Association already configured correctly. Nothing to do."
+                exit 0
+              else
+                echo "WARNING: Existing association points to different role: $EXISTING_ROLE"
+                echo "Deleting and recreating..."
+                aws eks delete-pod-identity-association \
+                  --cluster-name "$CLUSTER_NAME" \
+                  --association-id "$EXISTING_ASSOC"
+                echo "Waiting for deletion to complete..."
+                sleep 10
+              fi
+            fi
+
+            # Create pod identity association
+            echo "Creating pod identity association..."
+            ASSOCIATION_ARN=$(aws eks create-pod-identity-association \
+              --cluster-name "$CLUSTER_NAME" \
+              --namespace ack-system \
+              --service-account ack-eks-controller \
+              --role-arn "$ROLE_ARN" \
+              --query 'association.associationArn' \
+              --output text)
+
+            echo "Pod identity association created successfully!"
+            echo "Association ARN: $ASSOCIATION_ARN"
+        env:
+          - name: CLUSTER_NAME
+            value: {{ .Values.clusterName | quote }}
+          - name: ACK_EKS_CONTROLLER_ROLE_ARN
+            value: {{ printf "arn:aws:iam::%s:role/%s" (.Values.awsAccountId | toString) .Values.ackEksRoleArn | quote }}
+          - name: AWS_DEFAULT_REGION
+            value: {{ .Values.awsRegion | quote }}
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}

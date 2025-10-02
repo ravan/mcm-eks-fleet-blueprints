@@ -1,0 +1,27 @@
+# Fleet configuration for ACK EKS Controller Bootstrap Job (Helm Chart)
+# This Job creates the pod identity association for the ACK EKS controller
+# It uses the fleet-bootstrap service account which has pre-created pod identity association
+
+helm:
+  # Use local Helm chart
+  chart: ./chart
+  releaseName: fleet-bootstrap-ack-eks
+
+# Per-cluster customizations
+targetCustomizations:
+  - name: default
+    helm:
+      values:
+        # Inject cluster-specific values from Fleet cluster labels
+        # Account ID is quoted to ensure it's treated as a string, not a number
+        clusterName: "${ index .ClusterLabels \"cluster-name\" }"
+        awsRegion: "${ index .ClusterLabels \"aws-region\" }"
+        awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
+        ackEksRoleArn: "${ index .ClusterLabels \"ack-eks-role-arn\" }"
+
+    # Match all clusters in the cluster group
+    clusterGroup: all-eks-clusters
+
+# Dependency: Bootstrap job requires Pod Identity Agent
+dependsOn:
+  - name: eks-pod-identity-agent-blueprints-pod-identity-agent

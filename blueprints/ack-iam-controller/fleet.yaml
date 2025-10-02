@@ -1,0 +1,33 @@
+# Fleet configuration for ACK IAM Controller with Pod Identity
+# Uses wrapper Helm chart that includes both the ACK controller and PodIdentityAssociation
+
+defaultNamespace: ack-system
+
+helm:
+  # Use local wrapper Helm chart
+  chart: ./chart
+  releaseName: ack-iam-controller
+
+# Per-cluster customizations
+targetCustomizations:
+  - name: default
+    helm:
+      values:
+        # Inject cluster-specific values from Fleet cluster labels
+        clusterName: "${ index .ClusterLabels \"cluster-name\" }"
+        awsRegion: "${ index .ClusterLabels \"aws-region\" }"
+        awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
+        ackIamRoleName: "${ index .ClusterLabels \"ack-iam-role-arn\" }"
+
+        # Pass region to the iam-chart subchart
+        iam-chart:
+          aws:
+            region: "${ index .ClusterLabels \"aws-region\" }"
+
+    # Match all clusters in the cluster group
+    clusterGroup: all-eks-clusters
+
+# Dependencies: ACK IAM controller requires ACK EKS controller to be deployed first
+# ACK EKS controller creates the PodIdentityAssociation for this controller
+dependsOn:
+  - name: ack-controllers-blueprints-ack-eks-controller

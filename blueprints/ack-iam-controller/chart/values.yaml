@@ -1,0 +1,15 @@
+# Values for the wrapper chart
+clusterName: "placeholder"
+awsRegion: "us-east-1"
+awsAccountId: "000000000000"
+ackIamRoleName: "placeholder"
+
+# Values passed to the iam-chart subchart
+iam-chart:
+  serviceAccount:
+    create: true
+    name: ack-iam-controller
+    annotations: {}
+
+  aws:
+    region: "us-east-1"

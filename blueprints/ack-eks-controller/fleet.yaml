@@ -1,0 +1,38 @@
+# Fleet configuration for ACK EKS Controller with Pod Identity
+# The bootstrap Job (in separate bundle) creates the pod identity association before this deploys
+
+defaultNamespace: ack-system
+
+helm:
+  # Deploy the ACK EKS controller Helm chart from OCI registry
+  chart: oci://public.ecr.aws/aws-controllers-k8s/eks-chart
+  version: "1.9.2"
+  releaseName: ack-eks-controller
+
+  # Default values for all clusters
+  values:
+    # Service account configuration (no IRSA annotation for Pod Identity)
+    serviceAccount:
+      create: true
+      name: ack-eks-controller
+      annotations: {}
+
+    # AWS region will be set per cluster via targetCustomizations
+    aws:
+      region: "us-east-1"
+
+# Per-cluster customizations
+targetCustomizations:
+  - name: default
+    helm:
+      values:
+        # Set AWS region from cluster label (use index function for labels with hyphens)
+        aws:
+          region: "${ index .ClusterLabels \"aws-region\" }"
+
+    # Match all clusters in the cluster group
+    clusterGroup: all-eks-clusters
+
+# Dependencies: Requires bootstrap job to create pod identity association
+dependsOn:
+  - name: ack-controllers-blueprints-fleet-bootstrap-ack-eks

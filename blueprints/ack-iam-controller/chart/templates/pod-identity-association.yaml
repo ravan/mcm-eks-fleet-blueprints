@@ -1,0 +1,16 @@
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: PodIdentityAssociation
+metadata:
+  name: ack-iam-controller-pod-identity
+  namespace: ack-system
+  annotations:
+    description: "Pod Identity Association for ACK IAM Controller"
+spec:
+  clusterName: {{ .Values.clusterName | quote }}
+  namespace: ack-system
+  serviceAccount: ack-iam-controller
+  roleARN: {{ printf "arn:aws:iam::%s:role/%s" (.Values.awsAccountId | toString) .Values.ackIamRoleName | quote }}
+  tags:
+    ManagedBy: Fleet
+    Controller: ACK-IAM
+    Purpose: Pod-Identity-Association
