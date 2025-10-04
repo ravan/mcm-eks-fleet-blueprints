@@ -20,7 +20,5 @@ spec:
   # Polling interval - how often Fleet checks for changes
   pollingInterval: 60s
 
-  # Targets define which clusters these bundles deploy to
-  # This minimal target selection allows bundle-level targetCustomizations to inject values
-  targets:
-    - clusterGroup: all-eks-clusters
+  # No targets defined - each bundle's fleet.yaml defines targetCustomizations
+  # with clusterSelector for flexible per-bundle cluster targeting

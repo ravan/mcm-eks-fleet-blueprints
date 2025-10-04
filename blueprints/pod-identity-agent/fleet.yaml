@@ -32,5 +32,7 @@ targetCustomizations:
         env:
           AWS_REGION: "${ index .ClusterLabels \"aws-region\" }"
 
-    # Match all clusters in the cluster group
-    clusterGroup: all-eks-clusters
+    # Match clusters with cluster-type: eks label
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks

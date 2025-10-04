@@ -19,8 +19,10 @@ targetCustomizations:
         awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
         ackEksRoleArn: "${ index .ClusterLabels \"ack-eks-role-name\" }"
 
-    # Match all clusters in the cluster group
-    clusterGroup: all-eks-clusters
+    # Match clusters with cluster-type: eks label
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks
 
 # Dependency: Bootstrap job requires Pod Identity Agent
 dependsOn:

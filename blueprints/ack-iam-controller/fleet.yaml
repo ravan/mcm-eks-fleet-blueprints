@@ -24,8 +24,10 @@ targetCustomizations:
           aws:
             region: "${ index .ClusterLabels \"aws-region\" }"
 
-    # Match all clusters in the cluster group
-    clusterGroup: all-eks-clusters
+    # Match clusters with cluster-type: eks label
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks
 
 # Dependencies: ACK IAM controller requires ACK EKS controller to be deployed first
 # ACK EKS controller creates the PodIdentityAssociation for this controller
