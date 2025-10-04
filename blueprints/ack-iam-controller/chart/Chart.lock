@@ -1,0 +1,6 @@
+dependencies:
+- name: iam-chart
+  repository: oci://public.ecr.aws/aws-controllers-k8s
+  version: 1.5.2
+digest: sha256:0f98a76694d799af22ecf4ecf0112d47efd86225a84906c97bde42fd201c6d02
+generated: "2025-10-04T13:36:50.648423+02:00"
