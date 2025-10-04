@@ -20,7 +20,7 @@ spec:
   # Polling interval - how often Fleet checks for changes
   pollingInterval: 60s
 
-  # NOTE: Targets are NOT defined here to allow each bundle's fleet.yaml
-  # to define its own targetCustomizations with cluster-specific Helm values.
-  # When targets are defined at GitRepo level, Fleet ignores bundle-level
-  # targetCustomizations, preventing cluster-specific value injection.
+  # Targets define which clusters these bundles deploy to
+  # This minimal target selection allows bundle-level targetCustomizations to inject values
+  targets:
+    - clusterGroup: all-eks-clusters
