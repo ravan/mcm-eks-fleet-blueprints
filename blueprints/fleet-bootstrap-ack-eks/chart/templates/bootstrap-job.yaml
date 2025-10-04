@@ -83,8 +83,8 @@ spec:
             echo "Association ARN: $ASSOCIATION_ARN"
 
             # Wait for pod identity association to propagate
-            echo "Waiting 15 seconds for pod identity association to propagate..."
-            sleep 15
+            echo "Waiting 30 seconds for pod identity association to propagate to all nodes..."
+            sleep 30
             echo "Pod identity association should now be ready for use"
         env:
           - name: CLUSTER_NAME
