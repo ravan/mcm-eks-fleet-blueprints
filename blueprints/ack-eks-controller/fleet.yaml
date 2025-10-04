@@ -15,20 +15,15 @@ targetCustomizations:
     helm:
       values:
         # Inject cluster-specific values from Fleet cluster labels
-        clusterName: "${ index .ClusterLabels \"cluster-name\" }"
-        awsRegion: "${ index .ClusterLabels \"aws-region\" }"
-        awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
-        ackEksRoleName: "${ index .ClusterLabels \"ack-eks-role-name\" }"
+        clusterName: "${ get .ClusterLabels \"cluster-name\" }"
+        awsRegion: "${ get .ClusterLabels \"aws-region\" }"
+        awsAccountId: "${ get .ClusterLabels \"aws-account-id\" | quote }"
+        ackEksRoleName: "${ get .ClusterLabels \"ack-eks-role-name\" }"
 
         # Pass region to the eks-chart subchart
         eks-chart:
           aws:
-            region: "${ index .ClusterLabels \"aws-region\" }"
-
-    # Match clusters with cluster-type: eks label
-    clusterSelector:
-      matchLabels:
-        cluster-type: eks
+            region: "${ get .ClusterLabels \"aws-region\" }"
 
 # Dependencies: Requires bootstrap job to create pod identity association
 dependsOn:

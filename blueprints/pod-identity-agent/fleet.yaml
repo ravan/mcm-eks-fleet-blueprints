@@ -27,12 +27,7 @@ targetCustomizations:
     helm:
       values:
         # Reference cluster labels via Fleet's template variables
-        # Use index function for label names with hyphens
-        clusterName: "${ index .ClusterLabels \"cluster-name\" }"
+        # Use get function for label names with hyphens
+        clusterName: "${ get .ClusterLabels \"cluster-name\" }"
         env:
-          AWS_REGION: "${ index .ClusterLabels \"aws-region\" }"
-
-    # Match clusters with cluster-type: eks label
-    clusterSelector:
-      matchLabels:
-        cluster-type: eks
+          AWS_REGION: "${ get .ClusterLabels \"aws-region\" }"

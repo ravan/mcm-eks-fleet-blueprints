@@ -20,5 +20,9 @@ spec:
   # Polling interval - how often Fleet checks for changes
   pollingInterval: 60s
 
-  # No targets defined - each bundle's fleet.yaml defines targetCustomizations
-  # with clusterSelector for flexible per-bundle cluster targeting
+  # Target all EKS clusters - targetCustomizations in each bundle's fleet.yaml customize values
+  targets:
+    - name: eks-clusters
+      clusterSelector:
+        matchLabels:
+          cluster-type: eks
