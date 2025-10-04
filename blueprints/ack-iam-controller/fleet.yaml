@@ -14,15 +14,15 @@ targetCustomizations:
     helm:
       values:
         # Inject cluster-specific values from Fleet cluster labels
-        clusterName: "${ get .ClusterLabels \"cluster-name\" }"
-        awsRegion: "${ get .ClusterLabels \"aws-region\" }"
-        awsAccountId: "${ get .ClusterLabels \"aws-account-id\" | quote }"
-        ackIamRoleName: "${ get .ClusterLabels \"ack-iam-role-name\" }"
+        clusterName: ${ index .ClusterLabels "cluster-name" }
+        awsRegion: ${ index .ClusterLabels "aws-region" }
+        awsAccountId: ${ index .ClusterLabels "aws-account-id" }
+        ackIamRoleName: ${ index .ClusterLabels "ack-iam-role-name" }
 
         # Pass region to the iam-chart subchart
         iam-chart:
           aws:
-            region: "${ get .ClusterLabels \"aws-region\" }"
+            region: ${ index .ClusterLabels "aws-region" }
 
 # Dependencies: ACK IAM controller requires ACK EKS controller to be deployed first
 # ACK EKS controller creates the PodIdentityAssociation for this controller

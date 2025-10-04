@@ -13,11 +13,10 @@ targetCustomizations:
     helm:
       values:
         # Inject cluster-specific values from Fleet cluster labels
-        # Account ID is quoted to ensure it's treated as a string, not a number
-        clusterName: "${ get .ClusterLabels \"cluster-name\" }"
-        awsRegion: "${ get .ClusterLabels \"aws-region\" }"
-        awsAccountId: "${ get .ClusterLabels \"aws-account-id\" | quote }"
-        ackEksRoleArn: "${ get .ClusterLabels \"ack-eks-role-name\" }"
+        clusterName: ${ index .ClusterLabels "cluster-name" }
+        awsRegion: ${ index .ClusterLabels "aws-region" }
+        awsAccountId: ${ index .ClusterLabels "aws-account-id" }
+        ackEksRoleArn: ${ index .ClusterLabels "ack-eks-role-name" }
 
 # Dependency: Bootstrap job requires Pod Identity Agent
 dependsOn:
