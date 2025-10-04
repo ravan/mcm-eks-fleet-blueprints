@@ -81,6 +81,11 @@ spec:
 
             echo "Pod identity association created successfully!"
             echo "Association ARN: $ASSOCIATION_ARN"
+
+            # Wait for pod identity association to propagate
+            echo "Waiting 15 seconds for pod identity association to propagate..."
+            sleep 15
+            echo "Pod identity association should now be ready for use"
         env:
           - name: CLUSTER_NAME
             value: {{ .Values.clusterName | quote }}
