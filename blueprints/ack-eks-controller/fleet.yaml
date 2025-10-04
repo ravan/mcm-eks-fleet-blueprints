@@ -20,7 +20,7 @@ targetCustomizations:
         # Inject cluster-specific values from Fleet cluster labels
         clusterName: ${ index .ClusterLabels "cluster-name" }
         awsRegion: ${ index .ClusterLabels "aws-region" }
-        awsAccountId: ${ index .ClusterLabels "aws-account-id" }
+        awsAccountId: "${ index .ClusterLabels \"aws-account-id\" }"
         ackEksRoleName: ${ index .ClusterLabels "ack-eks-role-name" }
 
         # Pass region to the eks-chart subchart
