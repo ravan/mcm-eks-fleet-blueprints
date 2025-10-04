@@ -23,7 +23,10 @@ helm:
 targetCustomizations:
   # Dynamically set cluster-specific values using Fleet's cluster label variables
   # Assumes clusters have labels: cluster-name=<eks-cluster-name> and aws-region=<region>
-  - name: default
+  - name: eks-clusters
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks
     helm:
       values:
         # Reference cluster labels via Fleet's template variables
