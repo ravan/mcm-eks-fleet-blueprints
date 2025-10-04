@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wait-for-iam-pod-identity
+  namespace: ack-system
+  annotations:
+    description: "Wait for IAM controller pod identity association to be ready"
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "2"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      name: wait-for-iam-pod-identity
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: wait-for-pod-identity
+        image: bitnami/kubectl:latest
+        command:
+          - /bin/bash
+          - -c
+          - |
+            echo "Waiting for PodIdentityAssociation to be synced..."
+            MAX_ATTEMPTS=60
+            ATTEMPT=0
+
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking PodIdentityAssociation status..."
+
+              SYNCED=$(kubectl get podidentityassociation ack-iam-controller-pod-identity -n ack-system -o jsonpath='{.status.conditions[?(@.type=="ACK.ResourceSynced")].status}' 2>/dev/null || echo "")
+
+              if [ "$SYNCED" = "True" ]; then
+                echo "PodIdentityAssociation is synced!"
+                kubectl get podidentityassociation ack-iam-controller-pod-identity -n ack-system -o yaml
+                echo "Waiting additional 10 seconds for association to fully propagate..."
+                sleep 10
+                echo "Pod identity association is ready for use!"
+                exit 0
+              fi
+
+              echo "Association not yet synced (status: $SYNCED), waiting 5 seconds..."
+              sleep 5
+            done
+
+            echo "ERROR: PodIdentityAssociation not synced after $MAX_ATTEMPTS attempts"
+            exit 1
+  backoffLimit: 3
