@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: wait-for-eks-pod-identity
-  namespace: ack-system
+  namespace: fleet-system
   annotations:
     description: "Wait for EKS controller pod identity association to be ready"
     helm.sh/hook: pre-install,pre-upgrade
@@ -64,5 +64,5 @@ spec:
         env:
           - name: AWS_DEFAULT_REGION
             value: {{ .Values.awsRegion | quote }}
-      serviceAccountName: default
+      serviceAccountName: fleet-bootstrap
   backoffLimit: 3
