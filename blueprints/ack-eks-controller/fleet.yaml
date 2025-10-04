@@ -8,6 +8,8 @@ helm:
   # Use local wrapper Helm chart
   chart: ./chart
   releaseName: ack-eks-controller
+  # Wait for jobs to complete before marking bundle as ready
+  waitForJobs: true
 
 # Per-cluster customizations
 targetCustomizations:
