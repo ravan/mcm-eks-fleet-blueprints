@@ -6,6 +6,8 @@ helm:
   # Use local Helm chart
   chart: ./chart
   releaseName: fleet-bootstrap-ack-eks
+  # Wait for bootstrap job to complete before marking bundle as ready
+  waitForJobs: true
 
 # Per-cluster customizations
 targetCustomizations:
