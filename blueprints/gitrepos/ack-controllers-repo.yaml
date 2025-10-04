@@ -20,8 +20,7 @@ spec:
   # Polling interval - how often Fleet checks for changes
   pollingInterval: 60s
 
-  # Target clusters for deployment
-  # Deploy to all clusters in the all-eks-clusters ClusterGroup
-  targets:
-    - name: all-eks
-      clusterGroup: all-eks-clusters
+  # NOTE: Targets are NOT defined here to allow each bundle's fleet.yaml
+  # to define its own targetCustomizations with cluster-specific Helm values.
+  # When targets are defined at GitRepo level, Fleet ignores bundle-level
+  # targetCustomizations, preventing cluster-specific value injection.
