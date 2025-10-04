@@ -66,7 +66,7 @@ targetCustomizations:
         clusterName: "${ index .ClusterLabels \"cluster-name\" }"
         awsRegion: "${ index .ClusterLabels \"aws-region\" }"
         awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
-        ackIamRoleName: "${ index .ClusterLabels \"ack-iam-role-arn\" }"
+        ackIamRoleName: "${ index .ClusterLabels \"ack-iam-role-name\" }"
 ```
 
 The Helm chart template then uses these values to construct the role ARN:

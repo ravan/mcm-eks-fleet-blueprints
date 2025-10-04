@@ -17,7 +17,7 @@ targetCustomizations:
         clusterName: "${ index .ClusterLabels \"cluster-name\" }"
         awsRegion: "${ index .ClusterLabels \"aws-region\" }"
         awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
-        ackIamRoleName: "${ index .ClusterLabels \"ack-iam-role-arn\" }"
+        ackIamRoleName: "${ index .ClusterLabels \"ack-iam-role-name\" }"
 
         # Pass region to the iam-chart subchart
         iam-chart:

@@ -69,8 +69,8 @@ Example:
    - `cluster-name` = `<eks-cluster-name>` (e.g., `prod-eks-1`)
    - `aws-region` = `<region>` (e.g., `us-west-2`)
    - `aws-account-id` = `<account-id>`
-   - `ack-iam-role-arn` = `<ACKIAMControllerRoleArn from Step 1>`
-   - `ack-eks-role-arn` = `<ACKEKSControllerRoleArn from Step 1>`
+   - `ack-iam-role-name` = `<ACKIAMControllerRoleArn from Step 1>`
+   - `ack-eks-role-name` = `<ACKEKSControllerRoleArn from Step 1>`
 
 2. **Update GitRepo URLs**:
 

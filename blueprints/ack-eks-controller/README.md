@@ -99,7 +99,7 @@ targetCustomizations:
         clusterName: "${ index .ClusterLabels \"cluster-name\" }"
         awsRegion: "${ index .ClusterLabels \"aws-region\" }"
         awsAccountId: "${ index .ClusterLabels \"aws-account-id\" | quote }"
-        ackEksRoleArn: "${ index .ClusterLabels \"ack-eks-role-arn\" }"
+        ackEksRoleArn: "${ index .ClusterLabels \"ack-eks-role-name\" }"
 ```
 
 ### Implementation Details
