@@ -24,28 +24,3 @@ eks-chart:
   # AWS region configuration
   aws:
     region: "us-east-1"  # Default, overridden by Fleet
-
-  # Init container to wait for pod identity credentials
-  deployment:
-    initContainers:
-      - name: wait-for-pod-identity
-        image: amazon/aws-cli:latest
-        command:
-          - /bin/bash
-          - -c
-          - |
-            set -e
-            echo "Waiting for pod identity credentials to be available..."
-            MAX_ATTEMPTS=30
-            ATTEMPT=0
-            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-              if aws sts get-caller-identity > /dev/null 2>&1; then
-                echo "Pod identity credentials are available!"
-                exit 0
-              fi
-              ATTEMPT=$((ATTEMPT + 1))
-              echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Credentials not ready yet, waiting 2 seconds..."
-              sleep 2
-            done
-            echo "ERROR: Pod identity credentials did not become available after $MAX_ATTEMPTS attempts"
-            exit 1
