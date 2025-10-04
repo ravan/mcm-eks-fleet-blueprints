@@ -1,0 +1,4 @@
+# Values for IAM controller pod identity association bootstrap
+clusterName: ""
+awsAccountId: ""
+ackIamRoleName: ""

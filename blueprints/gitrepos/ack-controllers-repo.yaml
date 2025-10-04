@@ -15,6 +15,7 @@ spec:
   paths:
     - blueprints/fleet-bootstrap-ack-eks
     - blueprints/ack-eks-controller
+    - blueprints/fleet-bootstrap-ack-iam
     - blueprints/ack-iam-controller
 
   # Polling interval - how often Fleet checks for changes

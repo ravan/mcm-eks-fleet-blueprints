@@ -1,0 +1,22 @@
+# Fleet configuration for ACK IAM Controller PodIdentityAssociation Bootstrap
+# This bundle creates the PodIdentityAssociation CRD that the ACK EKS controller will reconcile
+
+helm:
+  chart: ./chart
+  releaseName: fleet-bootstrap-ack-iam
+
+# Per-cluster customizations
+targetCustomizations:
+  - name: eks-clusters
+    clusterSelector:
+      matchLabels:
+        cluster-type: eks
+    helm:
+      values:
+        clusterName: ${ index .ClusterLabels "cluster-name" }
+        awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
+        ackIamRoleName: ${ index .ClusterLabels "ack-iam-role-name" }
+
+# Dependency: Requires ACK EKS controller to be running to reconcile the CRD
+dependsOn:
+  - name: ack-controllers-blueprints-ack-eks-controller

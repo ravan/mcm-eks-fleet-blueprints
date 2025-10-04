@@ -1,0 +1,5 @@
+apiVersion: v2
+name: fleet-bootstrap-ack-iam
+description: Bootstrap chart that creates PodIdentityAssociation for ACK IAM Controller
+type: application
+version: 1.0.0
