@@ -1,0 +1,4 @@
+url: https://github.com/aws/eks-pod-identity-agent.git
+subdirectory: charts/eks-pod-identity-agent
+commit: 6eaa5e9aefc9a34c9605ff358e0e0f93860a918f
+packageVersion: 1

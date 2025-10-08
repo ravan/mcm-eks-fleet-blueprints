@@ -1,0 +1,9 @@
+--- charts-original/Chart.yaml
++++ charts/Chart.yaml
+@@ -1,5 +1,5 @@
+ apiVersion: v2
+-appVersion: 0.1.6
++appVersion: 0.1.34
+ description: A Helm chart for eks-pod-identity-agent
+ home: https://github.com/aws/eks-pod-identity-agent
+ icon: https://raw.githubusercontent.com/aws/eks-charts/master/docs/logo/aws.png
