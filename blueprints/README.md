@@ -14,12 +14,10 @@ blueprints/
 ├── pod-identity-agent/      # Bundle 0: EKS Pod Identity Agent
 │   ├── fleet.yaml
 │   └── README.md
-├── ack-eks-controller/      # Bundle 1: ACK EKS Controller + Bootstrap
-│   ├── chart/               # Wrapper Helm chart
+├── ack-eks-controller/      # Bundle 1: ACK EKS Controller
 │   ├── fleet.yaml
 │   └── README.md
-├── ack-iam-controller/      # Bundle 2: ACK IAM Controller + Bootstrap
-│   ├── chart/               # Wrapper Helm chart
+├── ack-iam-controller/      # Bundle 2: ACK IAM Controller
 │   ├── fleet.yaml
 │   └── README.md
 └── README.md
@@ -29,29 +27,29 @@ blueprints/
 
 ### Bundle 0: Pod Identity Agent
 
-**Purpose**: Deploys the EKS Pod Identity Agent DaemonSet to all clusters. Required for Pod Identity authentication.
+Deploys the EKS Pod Identity Agent DaemonSet. Required for Pod Identity authentication.
 
-**Implementation**: Direct Helm chart from GitHub repository
+**Source**: Helm repository (`eks-pod-identity-agent`)
 
 **Dependencies**: None
 
 ### Bundle 1: ACK EKS Controller
 
-**Purpose**: Deploys the ACK EKS controller which manages EKS resources including pod identity associations.
+Deploys the ACK EKS controller which manages EKS resources including pod identity associations.
 
-**Implementation**: Wrapper Helm chart with:
-- Pre-install Hook: Bootstrap Job (creates pod identity association via AWS CLI)
-- Main Chart: eks-chart subchart from OCI registry
+**Source**: Helm repository (`eks-chart` with `ack-eks-bootstrap` subchart)
+
+**Pod Identity**: Created via AWS CLI by `ack-eks-bootstrap` subchart
 
 **Dependencies**: Bundle 0
 
 ### Bundle 2: ACK IAM Controller
 
-**Purpose**: Deploys the ACK IAM controller which manages IAM resources (roles, policies, users, etc.)
+Deploys the ACK IAM controller which manages IAM resources (roles, policies, users, etc.)
 
-**Implementation**: Wrapper Helm chart with:
-- Pre-install Hook: Bootstrap Job (creates PodIdentityAssociation CRD via kubectl)
-- Main Chart: iam-chart subchart from OCI registry
+**Source**: Helm repository (`iam-chart` with `ack-pod-identity-association` subchart)
+
+**Pod Identity**: Created declaratively via PodIdentityAssociation CRD by `ack-pod-identity-association` subchart
 
 **Dependencies**: Bundle 1
 
@@ -110,10 +108,7 @@ blueprints/
    kubectl apply -f blueprints/gitrepos/ack-controllers-repo.yaml
    ```
 
-Fleet will automatically:
-- Deploy Pod Identity Agent (Bundle 0)
-- Run bootstrap Job and deploy ACK EKS controller (Bundle 1)
-- Create PodIdentityAssociation CRD and deploy ACK IAM controller (Bundle 2)
+Fleet automatically deploys all bundles in order with proper dependency management.
 
 ## Prerequisites
 
@@ -178,15 +173,7 @@ Additional Controllers (optional)
 
 ## Implementation Pattern
 
-All bundles use **Fleet's native Helm support with targetCustomizations** to inject cluster-specific values from cluster labels:
-
-- **Pod Identity Agent**: Direct Helm chart from GitHub repository
-- **ACK EKS Controller**: Wrapper Helm chart with bootstrap hook + eks-chart subchart from OCI
-- **ACK IAM Controller**: Wrapper Helm chart with bootstrap hook + iam-chart subchart from OCI
-
-**Bootstrap Hooks**: Each controller uses a Helm pre-install/pre-upgrade hook to create the pod identity association before the controller starts. This ensures credentials are available when the controller pod starts.
-
-No overlays, no Kustomize, no manual configuration - Fleet handles everything automatically!
+All bundles use Fleet's `targetCustomizations` to inject cluster-specific values from cluster labels. Charts are published to a Helm repository and include subcharts for pod identity management.
 
 ## Monitoring Deployment
 
@@ -237,23 +224,12 @@ kubectl describe gitrepo -n fleet-default ack-controllers
 kubectl logs -n fleet-default -l gitjob.fleet.cattle.io/gitrepo=ack-controllers
 ```
 
-### Bootstrap Hook Failing
-
-Check bootstrap Job logs in cattle-fleet-system namespace:
-
-```bash
-# For ACK EKS Controller
-kubectl logs -n cattle-fleet-system -l app.kubernetes.io/component=bootstrap
-
-# Check Job status
-kubectl get jobs -n cattle-fleet-system
-```
+### Pod Identity Issues
 
 Common issues:
 - fleet-bootstrap service account doesn't have pod identity association (run bootstrap script first)
-- Incorrect cluster name or role ARN in Job environment variables
-- AWS API rate limiting
-- For ACK IAM: ACK EKS controller not running (needed to reconcile PodIdentityAssociation CRD)
+- Incorrect cluster labels
+- IAM role doesn't have correct permissions or trust policy
 
 ### ACK Controller Pod Not Starting
 
@@ -262,90 +238,46 @@ kubectl describe pod -n ack-system <pod-name>
 kubectl logs -n ack-system <pod-name>
 ```
 
-Common issues:
-- Pod identity association not created
-- IAM role doesn't have correct permissions
-- IAM role trust policy incorrect (must use `pods.eks.amazonaws.com`)
+Check that pod identity association exists and IAM role trust policy uses `pods.eks.amazonaws.com`.
 
-### PodIdentityAssociation CRD Not Working
+### PodIdentityAssociation CRD Not Reconciling
 
 ```bash
-kubectl describe podidentityassociation -n ack-system ack-iam-controller-pod-identity
+kubectl describe podidentityassociation -n ack-system
 ```
 
-Common issues:
-- ACK EKS controller not running or not healthy
-- Cluster labels not correctly set or misspelled
-- Cluster name mismatch
-- IAM role ARN construction failed (check account ID and role name labels)
+Ensure ACK EKS controller is running and cluster labels are correct.
 
 ## Architecture Notes
 
-### Wrapper Helm Chart Pattern
+### Subchart Pattern
 
-This implementation uses wrapper Helm charts with bootstrap hooks to solve the challenge of injecting cluster-specific values:
-
-**Benefits**:
-1. **Fleet-native**: Uses Fleet's built-in `targetCustomizations` with Helm
-2. **Bootstrap hooks**: Helm pre-install hooks ensure pod identity associations exist before controllers start
-3. **Type-safe**: Helm templating validates values at render time
-4. **Single source**: One chart works for all clusters
-5. **Clean separation**: Cluster config in Fleet, templates in Helm
-
-**Bootstrap Hook Pattern**:
-- ACK EKS Controller: Helm hook runs Job with AWS CLI to create pod identity association
-- ACK IAM Controller: Helm hook runs Job with kubectl to create PodIdentityAssociation CRD (reconciled by ACK EKS controller)
+Charts use subcharts to handle pod identity association creation:
+- **ack-eks-bootstrap**: Used by EKS controller, creates association via AWS CLI
+- **ack-pod-identity-association**: Reusable subchart for other controllers, creates association declaratively via CRD
 
 ### Bootstrap Pattern
 
-The bootstrap pattern solves the "chicken and egg" problem:
+Solves the "chicken and egg" problem:
 
-1. **Initial Bootstrap** (manual, once per cluster): Creates pod identity association for `fleet-bootstrap` service account
-2. **ACK EKS Bootstrap Hook** (automated): Uses `fleet-bootstrap` SA to create pod identity association via AWS CLI
-3. **ACK IAM Bootstrap Hook** (automated): Uses `fleet-bootstrap` SA to create PodIdentityAssociation CRD (reconciled by ACK EKS controller)
-
-This pattern allows fully automated deployment after the initial per-cluster bootstrap.
+1. Manual bootstrap (once per cluster): Creates pod identity for `fleet-bootstrap` service account
+2. Automated deployment: Subcharts use `fleet-bootstrap` SA to create pod identity for controllers
+3. Subsequent controllers: Use declarative PodIdentityAssociation CRDs (no manual bootstrap)
 
 ### Dependency Ordering
 
-Fleet's `dependsOn` ensures proper deployment order:
-- Pod Identity Agent → ACK EKS Controller → ACK IAM Controller
+Fleet's `dependsOn` ensures: Pod Identity Agent → ACK EKS Controller → ACK IAM Controller
 
-If a dependency fails, Fleet will not deploy dependent bundles until the issue is resolved.
+## Adding New ACK Controllers
 
-## Next Steps
+To add additional ACK service controllers (RDS, S3, etc.), see the detailed guide in `packages/ack-pod-identity-association/README.md` which provides complete instructions for:
 
-After successful deployment of ACK controllers:
+1. Creating package definitions
+2. Adding the `ack-pod-identity-association` subchart dependency
+3. Building charts
+4. Creating Fleet bundles with proper configuration
 
-1. **Deploy Additional ACK Controllers**: Use the same pattern (PodIdentityAssociation CRD + Helm chart)
-2. **Manage IAM Resources**: Create IAM roles, policies, users via ACK IAM CRDs
-3. **Manage EKS Resources**: Create clusters, node groups, addons via ACK EKS CRDs
-4. **Application Deployments**: Use ACK to create IAM roles and pod identity associations for your applications
-
-## Example: Deploy Additional ACK Controller
-
-Create a new bundle for RDS controller:
-
-```
-blueprints/ack-rds-controller/
-├── fleet.yaml
-└── pod-identity-association.yaml
-```
-
-The PodIdentityAssociation CRD:
-
-```yaml
-apiVersion: eks.services.k8s.aws/v1alpha1
-kind: PodIdentityAssociation
-metadata:
-  name: ack-rds-controller-pod-identity
-  namespace: ack-system
-spec:
-  clusterName: my-cluster
-  namespace: ack-system
-  serviceAccount: ack-rds-controller
-  roleARN: arn:aws:iam::123456789012:role/ACKRDSControllerRole
-```
+This reusable pattern enables declarative pod identity management for all controllers.
 
 ## References
 

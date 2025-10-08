@@ -47,4 +47,33 @@ entries:
     urls:
     - assets/eks-pod-identity-agent/eks-pod-identity-agent-1.2.1+up1.2.0.tgz
     version: 1.2.1+up1.2.0
+  iam-chart:
+  - apiVersion: v1
+    appVersion: 1.5.2
+    created: "2025-10-08T20:15:05.491977+02:00"
+    dependencies:
+    - condition: ack-pod-identity-association.enabled
+      name: ack-pod-identity-association
+      repository: file://./charts/ack-pod-identity-association
+      version: 1.0.0
+    description: A Helm chart for the ACK service controller for AWS Identity & Access
+      Management (IAM)
+    digest: a952d5542b367f1c5f0720f7d77692ee92f4a63ae6739b7fe1b08824bd31d101
+    home: https://github.com/aws-controllers-k8s/iam-controller
+    icon: https://raw.githubusercontent.com/aws/eks-charts/master/docs/logo/aws.png
+    keywords:
+    - aws
+    - kubernetes
+    - iam
+    maintainers:
+    - name: ACK Admins
+      url: https://github.com/orgs/aws-controllers-k8s/teams/ack-admin
+    - name: IAM Admins
+      url: https://github.com/orgs/aws-controllers-k8s/teams/iam-maintainer
+    name: iam-chart
+    sources:
+    - https://github.com/aws-controllers-k8s/iam-controller
+    urls:
+    - assets/iam-chart/iam-chart-1.5.201+up1.5.2.tgz
+    version: 1.5.201+up1.5.2
 generated: "2025-10-08T12:32:32.479662+02:00"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ack-pod-identity-association
+description: Reusable chart for creating ACK PodIdentityAssociation CRDs via Helm hooks
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

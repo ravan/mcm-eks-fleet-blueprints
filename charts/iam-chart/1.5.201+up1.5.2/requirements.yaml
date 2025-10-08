@@ -1,0 +1,5 @@
+dependencies:
+- condition: ack-pod-identity-association.enabled
+  name: ack-pod-identity-association
+  repository: file://./charts/ack-pod-identity-association
+  version: 1.0.0

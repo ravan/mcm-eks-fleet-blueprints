@@ -1,0 +1,47 @@
+# Values for ACK Pod Identity Association chart
+# This chart creates PodIdentityAssociation CRDs declaratively via Helm hooks
+
+# Pod Identity configuration
+podIdentity:
+  # Enable creation of PodIdentityAssociation CRD
+  enabled: true
+
+  # Name of the PodIdentityAssociation resource
+  name: ""
+
+  # EKS cluster name
+  clusterName: ""
+
+  # AWS Account ID (used to construct role ARN if roleArn is not specified)
+  awsAccountId: ""
+
+  # IAM role name (used to construct role ARN if roleArn is not specified)
+  roleName: ""
+
+  # Full IAM role ARN (takes precedence over awsAccountId + roleName)
+  roleArn: ""
+
+  # Service account name to associate with the role
+  serviceAccountName: ""
+
+  # Namespace for the pod identity association (defaults to Release.Namespace if empty)
+  namespace: ""
+
+# Hook job configuration
+hook:
+  # Bootstrap job settings
+  bootstrap:
+    backoffLimit: 10
+    ttlSecondsAfterFinished: 86400  # Keep job for 24 hours
+    image: "alpine/k8s:1.29.2"
+    serviceAccountName: ""  # Will be auto-generated if empty
+
+  # Cleanup job settings
+  cleanup:
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 300  # Keep job for 5 minutes
+    image: "alpine/k8s:1.29.2"
+    serviceAccountName: ""  # Will be auto-generated if empty
+
+# Controller name - used for labeling and naming resources
+controllerName: "ack-controller"

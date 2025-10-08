@@ -1,0 +1,96 @@
+{{- if .Values.podIdentity.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "ack-pod-identity-association.cleanup.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ack-pod-identity-association.fullname" . }}-cleanup-role
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+- apiGroups: ["eks.services.k8s.aws"]
+  resources: ["podidentityassociations"]
+  verbs: ["get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ack-pod-identity-association.fullname" . }}-cleanup-rb
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ack-pod-identity-association.fullname" . }}-cleanup-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "ack-pod-identity-association.cleanup.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ack-pod-identity-association.fullname" . }}-cleanup-identity
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-pod-identity-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cleanup-hook
+spec:
+  backoffLimit: {{ .Values.hook.cleanup.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.hook.cleanup.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "ack-pod-identity-association.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cleanup-hook
+    spec:
+      serviceAccountName: {{ include "ack-pod-identity-association.cleanup.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+      - name: cleanup-pod-identity
+        image: {{ .Values.hook.cleanup.image }}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+
+            RESOURCE_NAME="{{ .Values.podIdentity.name }}"
+            NAMESPACE="{{ .Release.Namespace }}"
+
+            echo "=== Cleaning up PodIdentityAssociation ==="
+            echo "Resource: $RESOURCE_NAME"
+            echo "Namespace: $NAMESPACE"
+            echo ""
+
+            # Check if the resource exists
+            if kubectl get podidentityassociation $RESOURCE_NAME -n $NAMESPACE >/dev/null 2>&1; then
+              echo "Found PodIdentityAssociation, deleting..."
+              kubectl delete podidentityassociation $RESOURCE_NAME -n $NAMESPACE --wait=false
+              echo "✓ PodIdentityAssociation deletion initiated"
+            else
+              echo "PodIdentityAssociation not found, nothing to clean up"
+            fi
+
+            echo "✓ Cleanup complete"
+            exit 0
+{{- end }}

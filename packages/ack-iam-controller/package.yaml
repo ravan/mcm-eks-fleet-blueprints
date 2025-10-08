@@ -1,0 +1,2 @@
+url: oci://public.ecr.aws/aws-controllers-k8s/iam-chart:1.5.2
+packageVersion: 1

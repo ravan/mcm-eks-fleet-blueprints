@@ -1,11 +1,14 @@
 # Fleet configuration for ACK IAM Controller with Pod Identity
-# Uses wrapper Helm chart that includes both the ACK controller and PodIdentityAssociation
+# Uses package-built Helm chart from Helm repository
+# PodIdentityAssociation is created declaratively by the chart
 
 defaultNamespace: ack-system
 
 helm:
-  # Use local wrapper Helm chart
-  chart: ./chart
+  # Use the Helm chart from the Helm repository
+  chart: iam-chart
+  repo: https://ravan.github.io/mcm-eks-fleet-blueprints/
+  version: 1.5.201+up1.5.2
   releaseName: ack-iam-controller
 
 # Per-cluster customizations
@@ -22,14 +25,23 @@ targetCustomizations:
         awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
         ackIamRoleName: ${ default "MCMACKIAMControllerRole" (get .ClusterLabels "ack-iam-role-name") }
 
-        # Pass region to the iam-chart subchart
-        iam-chart:
-          aws:
-            region: ${ index .ClusterLabels "aws-region" }
+        # Pass AWS region to the chart
+        aws:
+          region: ${ index .ClusterLabels "aws-region" }
+
+        # Configure Pod Identity subchart
+        ack-pod-identity-association:
+          fullnameOverride: "ack-iam-pi"
+          controllerName: "ack-iam-controller"
+          podIdentity:
+            enabled: true
+            name: "ack-iam-controller-pod-identity"
+            clusterName: ${ index .ClusterLabels "cluster-name" }
+            awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
+            roleName: ${ default "MCMACKIAMControllerRole" (get .ClusterLabels "ack-iam-role-name") }
+            serviceAccountName: "ack-iam-controller"
+            namespace: "ack-system"
 
 # Dependencies: Requires ACK EKS controller to reconcile PodIdentityAssociation CRD
 dependsOn:
   - name: ack-eks-controller-blueprints-ack-eks-controller
-
-# Wait for bootstrap Job to complete before deploying controller
-waitForJobs: true
