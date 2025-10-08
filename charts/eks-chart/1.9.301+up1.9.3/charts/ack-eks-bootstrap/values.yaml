@@ -1,0 +1,28 @@
+# Values for ACK EKS Bootstrap Job
+# These are overridden by parent chart values
+
+# Cluster name (injected by parent)
+clusterName: ""
+
+# AWS region (injected by parent)
+awsRegion: ""
+
+# AWS account ID (injected by parent)
+awsAccountId: ""
+
+# ACK EKS controller IAM role name (injected by parent)
+ackEksRoleName: "MCMACKEKSControllerRole"
+
+# Target namespace for the controller (injected by parent)
+namespace: "ack-system"
+
+# Service account to create association for (injected by parent)
+serviceAccount: "ack-eks-controller"
+
+# Bootstrap job configuration
+bootstrap:
+  # Service account used BY the bootstrap job (has pod identity already)
+  serviceAccount: fleet-bootstrap
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400  # Keep job for 24 hours
+  image: "amazon/aws-cli:latest"

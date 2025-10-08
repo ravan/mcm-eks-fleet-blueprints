@@ -1,0 +1,5 @@
+dependencies:
+- condition: ack-eks-bootstrap.enabled
+  name: ack-eks-bootstrap
+  repository: file://./charts/ack-eks-bootstrap
+  version: 1.0.0

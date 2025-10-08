@@ -1,0 +1,2 @@
+url: oci://public.ecr.aws/aws-controllers-k8s/eks-chart:1.9.3
+packageVersion: 1

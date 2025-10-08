@@ -1,0 +1,112 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.bootstrap.serviceAccount }}
+  namespace: cattle-fleet-system
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-bootstrap
+  namespace: cattle-fleet-system
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/component: bootstrap
+spec:
+  backoffLimit: {{ .Values.bootstrap.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.bootstrap.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      serviceAccountName: {{ .Values.bootstrap.serviceAccount }}
+      restartPolicy: Never
+      containers:
+      - name: bootstrap
+        image: {{ .Values.bootstrap.image }}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+
+            echo "=== ACK EKS Controller Bootstrap ==="
+            echo "Creating pod identity association..."
+
+            CLUSTER_NAME="{{ .Values.clusterName }}"
+            ROLE_ARN="arn:aws:iam::{{ .Values.awsAccountId }}:role/{{ .Values.ackEksRoleName }}"
+            NAMESPACE="{{ .Values.namespace }}"
+            SERVICE_ACCOUNT="{{ .Values.serviceAccount }}"
+
+            if [ -z "$CLUSTER_NAME" ] || [ -z "$ROLE_ARN" ]; then
+              echo "ERROR: CLUSTER_NAME and ROLE_ARN must be set"
+              exit 1
+            fi
+
+            echo "Cluster: $CLUSTER_NAME"
+            echo "Role ARN: $ROLE_ARN"
+            echo "Namespace: $NAMESPACE"
+            echo "Service Account: $SERVICE_ACCOUNT"
+
+            # Check if association already exists
+            EXISTING_ASSOC=$(aws eks list-pod-identity-associations \
+              --cluster-name "$CLUSTER_NAME" \
+              --namespace "$NAMESPACE" \
+              --service-account "$SERVICE_ACCOUNT" \
+              --query 'associations[0].associationId' \
+              --output text 2>/dev/null || echo "")
+
+            if [ -n "$EXISTING_ASSOC" ] && [ "$EXISTING_ASSOC" != "None" ]; then
+              echo "Pod identity association already exists: $EXISTING_ASSOC"
+              echo "Verifying it points to the correct role..."
+
+              EXISTING_ROLE=$(aws eks describe-pod-identity-association \
+                --cluster-name "$CLUSTER_NAME" \
+                --association-id "$EXISTING_ASSOC" \
+                --query 'association.roleArn' \
+                --output text)
+
+              if [ "$EXISTING_ROLE" = "$ROLE_ARN" ]; then
+                echo "✓ Association already configured correctly"
+                exit 0
+              else
+                echo "WARNING: Existing association points to different role: $EXISTING_ROLE"
+                echo "Deleting and recreating..."
+                aws eks delete-pod-identity-association \
+                  --cluster-name "$CLUSTER_NAME" \
+                  --association-id "$EXISTING_ASSOC"
+                echo "Waiting for deletion to complete..."
+                sleep 10
+              fi
+            fi
+
+            # Create pod identity association
+            echo "Creating pod identity association..."
+            ASSOCIATION_ARN=$(aws eks create-pod-identity-association \
+              --cluster-name "$CLUSTER_NAME" \
+              --namespace "$NAMESPACE" \
+              --service-account "$SERVICE_ACCOUNT" \
+              --role-arn "$ROLE_ARN" \
+              --query 'association.associationArn' \
+              --output text)
+
+            echo "✓ Pod identity association created successfully!"
+            echo "Association ARN: $ASSOCIATION_ARN"
+
+            # Wait for credentials to propagate to EKS pod identity agent
+            echo "Waiting 10 seconds for credentials to propagate..."
+            sleep 10
+            echo "✓ Bootstrap complete. Controller deployment can now start."
+        env:
+          - name: AWS_DEFAULT_REGION
+            value: {{ .Values.awsRegion | quote }}

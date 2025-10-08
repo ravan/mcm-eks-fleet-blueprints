@@ -1,0 +1,4 @@
+# Local chart - no upstream URL
+url: local
+version: 1.0.0
+doNotRelease: true

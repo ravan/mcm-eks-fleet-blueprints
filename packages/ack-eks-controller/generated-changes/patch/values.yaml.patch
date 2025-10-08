@@ -1,0 +1,32 @@
+--- charts-original/values.yaml
++++ charts/values.yaml
+@@ -186,5 +186,25 @@
+   TeamLevelCARM: false
+   # Enable ReadOnlyResources feature/annotation. 
+   ReadOnlyResources: true
+-  # Enable ResourceAdoption feature/annotation. 
+-  ResourceAdoption: true
+\ No newline at end of file
++  # Enable ResourceAdoption feature/annotation.
++  ResourceAdoption: true
++
++# Values for bootstrap subchart (ack-eks-bootstrap)
++# These are injected by Fleet from cluster labels
++clusterName: ""
++awsAccountId: ""
++ackEksRoleName: "MCMACKEKSControllerRole"
++
++# Bootstrap subchart configuration
++ack-eks-bootstrap:
++  clusterName: ""
++  awsRegion: ""
++  awsAccountId: ""
++  ackEksRoleName: "MCMACKEKSControllerRole"
++  namespace: "ack-system"
++  serviceAccount: "ack-eks-controller"
++  bootstrap:
++    serviceAccount: "fleet-bootstrap"
++    backoffLimit: 3
++    ttlSecondsAfterFinished: 86400
++    image: "amazon/aws-cli:latest"
+\ No newline at end of file

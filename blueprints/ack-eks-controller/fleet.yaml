@@ -5,8 +5,10 @@
 defaultNamespace: ack-system
 
 helm:
-  # Use local wrapper Helm chart
-  chart: ./chart
+  # Use the Helm chart from the Helm repository
+  chart: eks-chart
+  repo: https://ravan.github.io/mcm-eks-fleet-blueprints/
+  version: 1.9.301+up1.9.3
   releaseName: ack-eks-controller
 
 # Per-cluster customizations
@@ -23,10 +25,18 @@ targetCustomizations:
         awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
         ackEksRoleName: ${ default "MCMACKEKSControllerRole" (get .ClusterLabels "ack-eks-role-name") }
 
-        # Pass region to the eks-chart subchart
-        eks-chart:
-          aws:
-            region: ${ index .ClusterLabels "aws-region" }
+        # Pass AWS region to the main chart
+        aws:
+          region: ${ index .ClusterLabels "aws-region" }
+
+        # Pass values to the bootstrap subchart
+        ack-eks-bootstrap:
+          clusterName: ${ index .ClusterLabels "cluster-name" }
+          awsRegion: ${ index .ClusterLabels "aws-region" }
+          awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
+          ackEksRoleName: ${ default "MCMACKEKSControllerRole" (get .ClusterLabels "ack-eks-role-name") }
+          namespace: "ack-system"
+          serviceAccount: "ack-eks-controller"
 
 # Dependencies: Requires Pod Identity Agent to be running
 dependsOn:

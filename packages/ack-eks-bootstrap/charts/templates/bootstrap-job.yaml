@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: fleet-bootstrap
+  name: {{ .Values.bootstrap.serviceAccount }}
   namespace: cattle-fleet-system
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
@@ -29,11 +29,11 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}
         app.kubernetes.io/component: bootstrap
     spec:
-      serviceAccountName: fleet-bootstrap
+      serviceAccountName: {{ .Values.bootstrap.serviceAccount }}
       restartPolicy: Never
       containers:
       - name: bootstrap
-        image: amazon/aws-cli:latest
+        image: {{ .Values.bootstrap.image }}
         command:
           - /bin/bash
           - -c
@@ -45,8 +45,8 @@ spec:
 
             CLUSTER_NAME="{{ .Values.clusterName }}"
             ROLE_ARN="arn:aws:iam::{{ .Values.awsAccountId }}:role/{{ .Values.ackEksRoleName }}"
-            NAMESPACE="{{ .Release.Namespace }}"
-            SERVICE_ACCOUNT="ack-eks-controller"
+            NAMESPACE="{{ .Values.namespace }}"
+            SERVICE_ACCOUNT="{{ .Values.serviceAccount }}"
 
             if [ -z "$CLUSTER_NAME" ] || [ -z "$ROLE_ARN" ]; then
               echo "ERROR: CLUSTER_NAME and ROLE_ARN must be set"

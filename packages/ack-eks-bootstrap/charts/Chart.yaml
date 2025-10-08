@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ack-eks-bootstrap
+description: Bootstrap Job for ACK EKS Controller Pod Identity Association
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
