@@ -4,9 +4,10 @@
 namespace: kube-system
 
 helm:
-  # Use the Helm chart directly from the GitHub repository using go-getter git URL format
-  # Fleet will clone the repo and navigate to the charts/eks-pod-identity-agent subdirectory
-  chart: git::https://github.com/aws/eks-pod-identity-agent.git//charts/eks-pod-identity-agent?ref=main
+  # Use the Helm chart from the Helm repository
+  chart: eks-pod-identity-agent
+  repo: https://ravan.github.io/mcm-eks-fleet-blueprints/
+  version: 1.2.1+up1.2.0
 
   # Release name for the Helm deployment
   releaseName: eks-pid-agent
