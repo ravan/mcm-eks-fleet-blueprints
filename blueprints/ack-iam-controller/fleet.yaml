@@ -29,7 +29,7 @@ targetCustomizations:
 
 # Dependencies: Requires ACK EKS controller to reconcile PodIdentityAssociation CRD
 dependsOn:
-  - name: ack-controllers-blueprints-ack-eks-controller
+  - name: ack-eks-controller-blueprints-ack-eks-controller
 
 # Wait for bootstrap Job to complete before deploying controller
 waitForJobs: true

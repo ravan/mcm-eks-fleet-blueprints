@@ -1,7 +1,7 @@
 kind: GitRepo
 apiVersion: fleet.cattle.io/v1alpha1
 metadata:
-  name: ack-controllers
+  name: ack-iam-controller
   namespace: fleet-default
 spec:
   # Repository URL - update this to your actual repository URL
@@ -13,7 +13,6 @@ spec:
   # Paths to monitor in the repository
   # Each path will become a separate bundle with proper dependencies
   paths:
-    - blueprints/ack-eks-controller
     - blueprints/ack-iam-controller
 
   # Polling interval - how often Fleet checks for changes

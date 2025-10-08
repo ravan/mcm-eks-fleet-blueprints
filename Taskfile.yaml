@@ -176,13 +176,15 @@ tasks:
     cmds:
       - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/cluster-groups/all-eks-clusters.yaml
       - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/pod-identity-agent-repo.yaml
-      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-controllers-repo.yaml
+      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-eks-controller-repo.yaml
+      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-iam-controller-repo.yaml
   
   fleet-reset-gitrepo-definitions:
     silent: true
     cmds:
       - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/pod-identity-agent-repo.yaml
-      - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-controllers-repo.yaml
+      - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-eks-controller-repo.yaml
+      - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-iam-controller-repo.yaml
 
   login-ecr-public-repo:
     silent: true
