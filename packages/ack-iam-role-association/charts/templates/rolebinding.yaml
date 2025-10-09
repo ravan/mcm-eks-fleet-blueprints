@@ -1,0 +1,46 @@
+{{- if .Values.enabled }}
+---
+# RoleBinding for IAM role creation hook
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ack-iam-role-association.fullname" . }}-iam-role-rb
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "{{ .Values.hook.weight }}"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-iam-role-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iam-role-hook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ack-iam-role-association.fullname" . }}-iam-role-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "ack-iam-role-association.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+# RoleBinding for cleanup hook
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ack-iam-role-association.fullname" . }}-cleanup-rb
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-iam-role-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cleanup-hook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ack-iam-role-association.fullname" . }}-cleanup-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "ack-iam-role-association.cleanup.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

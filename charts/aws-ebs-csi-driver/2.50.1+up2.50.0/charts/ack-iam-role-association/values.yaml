@@ -1,0 +1,77 @@
+# Values for ACK IAM Role Association chart
+# This chart creates IAM Role CRDs declaratively via Helm hooks
+
+# IAM role configuration
+iamRole:
+  # IAM role name in AWS (must be unique within AWS account)
+  name: ""
+
+  # IAM path for organization (optional)
+  path: "/"
+
+  # Human-readable description
+  description: "IAM role created by ack-iam-role-association"
+
+  # Trust policy configuration
+  trustPolicy:
+    # Service principal for EKS pod identity
+    servicePrincipal: "pods.eks.amazonaws.com"
+    # Actions allowed for assume role
+    actions:
+      - "sts:AssumeRole"
+      - "sts:TagSession"
+
+  # Managed policy ARNs to attach
+  # Example: ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]
+  policies: []
+
+  # Inline policies (map of policy name to JSON document string)
+  # Example:
+  # inlinePolicies:
+  #   CustomPolicy: |
+  #     {
+  #       "Version": "2012-10-17",
+  #       "Statement": [...]
+  #     }
+  inlinePolicies: {}
+
+  # Maximum session duration in seconds (1-12 hours: 3600-43200)
+  maxSessionDuration: 3600
+
+  # Tags for organization and cost tracking
+  # Example:
+  # tags:
+  #   - key: "managed-by"
+  #     value: "fleet"
+  tags: []
+
+# Hook job configuration
+hook:
+  # Helm hook weight (controls execution order)
+  # Recommended: -10 (before pod identity hooks at -5)
+  weight: -10
+
+  # Job retry configuration
+  backoffLimit: 10
+
+  # Keep job for debugging (24 hours in seconds)
+  ttlSecondsAfterFinished: 86400
+
+  # Container image with kubectl
+  image: "alpine/k8s:1.29.2"
+
+  # Service account name for RBAC (auto-generated if empty)
+  serviceAccountName: ""
+
+  # Cleanup hook configuration
+  cleanup:
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 300  # 5 minutes
+    image: "alpine/k8s:1.29.2"
+    serviceAccountName: ""
+
+# Controller name - used for labeling and naming resources
+controllerName: "ack-controller"
+
+# Enable IAM role creation
+enabled: true

@@ -186,6 +186,20 @@ tasks:
       - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-eks-controller-repo.yaml
       - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/ack-iam-controller-repo.yaml
 
+  charts-build-all-and-update-index:
+    desc: "Build all package charts and update Helm repository index"
+    silent: false
+    cmds:
+      - echo "Building all package charts..."
+      - PACKAGE=ack-eks-bootstrap ./bin/charts-build-scripts charts
+      - PACKAGE=ack-eks-controller ./bin/charts-build-scripts charts
+      - PACKAGE=ack-iam-controller ./bin/charts-build-scripts charts
+      - PACKAGE=ack-iam-role-association ./bin/charts-build-scripts charts
+      - PACKAGE=ack-pod-identity-association ./bin/charts-build-scripts charts
+      - PACKAGE=aws-ebs-csi-driver ./bin/charts-build-scripts charts
+      - PACKAGE=eks-pod-identity-agent ./bin/charts-build-scripts charts
+      - echo "✓ All charts built and index.yaml updated"
+ 
   login-ecr-public-repo:
     silent: true
     cmds:
@@ -205,3 +219,26 @@ tasks:
     silent: true
     cmds:
       - kubectl get nodes {{.KUBECONFIG}}
+
+  install-aws-ebs-csi-driver:
+    desc: "Install AWS EBS CSI Driver manually (without Fleet) for testing"
+    silent: false
+    cmds:
+      - helm upgrade --install -n kube-system {{.KUBECONFIG}} -f config/aws-ebs-csi-driver/test-values.yaml aws-ebs-csi-driver charts/aws-ebs-csi-driver/2.50.1+up2.50.0/
+      - echo "AWS EBS CSI Driver installed. Waiting for pods to start..."
+      - sleep 10
+      - kubectl get pods -n kube-system {{.KUBECONFIG}} -l app.kubernetes.io/name=aws-ebs-csi-driver
+
+  fleet-define-gitrepo-aws-ebs-csi-driver:
+    desc: "Apply AWS EBS CSI Driver GitRepo to Fleet for automated deployment"
+    silent: false
+    cmds:
+      - kubectl apply {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/aws-ebs-csi-driver-repo.yaml
+      - echo "GitRepo applied. Fleet will deploy to clusters with label addon-aws-ebs-csi-driver=true"
+
+  fleet-reset-gitrepo-aws-ebs-csi-driver:
+    desc: "Remove AWS EBS CSI Driver GitRepo from Fleet"
+    silent: false
+    cmds:
+      - kubectl delete {{.KUBECONFIG_RANCHER}} -f blueprints/gitrepos/aws-ebs-csi-driver-repo.yaml
+      - echo "GitRepo removed. EBS CSI Driver bundles will be cleaned up from target clusters"

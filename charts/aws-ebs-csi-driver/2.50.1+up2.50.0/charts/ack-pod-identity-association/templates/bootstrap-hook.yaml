@@ -1,0 +1,144 @@
+{{- if .Values.podIdentity.enabled }}
+{{- $roleArn := include "ack-pod-identity-association.roleArn" . }}
+{{- $namespace := include "ack-pod-identity-association.namespace" . }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "ack-pod-identity-association.bootstrap.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ack-pod-identity-association.fullname" . }}-bootstrap-role
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+- apiGroups: ["eks.services.k8s.aws"]
+  resources: ["podidentityassociations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ack-pod-identity-association.fullname" . }}-bootstrap-rb
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ack-pod-identity-association.fullname" . }}-bootstrap-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "ack-pod-identity-association.bootstrap.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ack-pod-identity-association.fullname" . }}-bootstrap-identity
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-pod-identity-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap-hook
+spec:
+  backoffLimit: {{ .Values.hook.bootstrap.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.hook.bootstrap.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "ack-pod-identity-association.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap-hook
+    spec:
+      serviceAccountName: {{ include "ack-pod-identity-association.bootstrap.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+      - name: bootstrap-pod-identity
+        image: {{ .Values.hook.bootstrap.image }}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+
+            RESOURCE_NAME="{{ .Values.podIdentity.name }}"
+            NAMESPACE="{{ .Release.Namespace }}"
+            CLUSTER_NAME="{{ .Values.podIdentity.clusterName }}"
+            SERVICE_ACCOUNT="{{ .Values.podIdentity.serviceAccountName }}"
+            ROLE_ARN="{{ $roleArn }}"
+
+            echo "=== Bootstrapping PodIdentityAssociation ==="
+            echo "Resource: $RESOURCE_NAME"
+            echo "Namespace: $NAMESPACE"
+            echo "Cluster: $CLUSTER_NAME"
+            echo "ServiceAccount: $SERVICE_ACCOUNT"
+            echo "Role ARN: $ROLE_ARN"
+            echo ""
+
+            # Create the PodIdentityAssociation CRD
+            echo "Creating PodIdentityAssociation..."
+            cat <<EOF | kubectl apply -f -
+            apiVersion: eks.services.k8s.aws/v1alpha1
+            kind: PodIdentityAssociation
+            metadata:
+              name: $RESOURCE_NAME
+              namespace: $NAMESPACE
+              labels:
+                {{- include "ack-pod-identity-association.labels" . | nindent 16 }}
+            spec:
+              clusterName: $CLUSTER_NAME
+              namespace: $NAMESPACE
+              serviceAccount: $SERVICE_ACCOUNT
+              roleARN: $ROLE_ARN
+            EOF
+
+            echo "✓ PodIdentityAssociation created"
+            echo ""
+
+            # Wait for the CRD to be reconciled by checking status
+            echo "=== Waiting for PodIdentityAssociation to be reconciled by ACK ==="
+            MAX_ATTEMPTS=60
+            ATTEMPT=0
+            while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+
+              # Check if status.ackResourceMetadata.arn exists (indicates successful reconciliation)
+              ARN=$(kubectl get podidentityassociation $RESOURCE_NAME -n $NAMESPACE \
+                -o jsonpath='{.status.ackResourceMetadata.arn}' 2>/dev/null || echo "")
+
+              if [ -n "$ARN" ]; then
+                echo "✓ PodIdentityAssociation reconciled successfully!"
+                echo "Association ARN: $ARN"
+                echo ""
+                echo "Waiting additional 15 seconds for association to propagate to pod identity agent..."
+                sleep 15
+                echo "✓ Ready to deploy controller"
+                exit 0
+              fi
+
+              if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: CRD not yet reconciled, waiting 5 seconds..."
+                sleep 5
+              else
+                echo "ERROR: CRD was not reconciled after $MAX_ATTEMPTS attempts"
+                echo "Current status:"
+                kubectl get podidentityassociation $RESOURCE_NAME -n $NAMESPACE -o yaml || true
+                exit 1
+              fi
+            done
+{{- end }}

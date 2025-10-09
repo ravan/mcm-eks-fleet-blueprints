@@ -1,9 +1,39 @@
 apiVersion: v1
 entries:
+  aws-ebs-csi-driver:
+  - apiVersion: v2
+    appVersion: 1.50.0
+    created: "2025-10-09T13:40:28.615719+02:00"
+    dependencies:
+    - condition: ack-iam-role-association.enabled
+      name: ack-iam-role-association
+      repository: file://./charts/ack-iam-role-association
+      version: 1.0.0
+    - condition: ack-pod-identity-association.enabled
+      name: ack-pod-identity-association
+      repository: file://./charts/ack-pod-identity-association
+      version: 1.0.0
+    description: A Helm chart for AWS EBS CSI Driver
+    digest: 3b2233c11a5b056648bffa6521ad8213c7c5766fc15404353351389d3d3c14fc
+    home: https://github.com/kubernetes-sigs/aws-ebs-csi-driver
+    keywords:
+    - aws
+    - ebs
+    - csi
+    kubeVersion: '>=1.17.0-0'
+    maintainers:
+    - name: Kubernetes Authors
+      url: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/
+    name: aws-ebs-csi-driver
+    sources:
+    - https://github.com/kubernetes-sigs/aws-ebs-csi-driver
+    urls:
+    - assets/aws-ebs-csi-driver/aws-ebs-csi-driver-2.50.1+up2.50.0.tgz
+    version: 2.50.1+up2.50.0
   eks-chart:
   - apiVersion: v1
     appVersion: 1.9.3
-    created: "2025-10-08T15:06:59.131436+02:00"
+    created: "2025-10-09T13:40:28.616465+02:00"
     dependencies:
     - condition: ack-eks-bootstrap.enabled
       name: ack-eks-bootstrap
@@ -32,7 +62,7 @@ entries:
   eks-pod-identity-agent:
   - apiVersion: v2
     appVersion: 0.1.34
-    created: "2025-10-08T12:32:32.480752+02:00"
+    created: "2025-10-09T13:40:28.616864+02:00"
     description: A Helm chart for eks-pod-identity-agent
     digest: f9d2051f0bac92bf47fa8666b73ed07bf3bc32824e73e77516efff01ee102523
     home: https://github.com/aws/eks-pod-identity-agent
@@ -50,7 +80,7 @@ entries:
   iam-chart:
   - apiVersion: v1
     appVersion: 1.5.2
-    created: "2025-10-08T20:15:05.491977+02:00"
+    created: "2025-10-09T13:40:28.617523+02:00"
     dependencies:
     - condition: ack-pod-identity-association.enabled
       name: ack-pod-identity-association
@@ -76,4 +106,4 @@ entries:
     urls:
     - assets/iam-chart/iam-chart-1.5.201+up1.5.2.tgz
     version: 1.5.201+up1.5.2
-generated: "2025-10-08T12:32:32.479662+02:00"
+generated: "2025-10-09T13:36:31.473337+02:00"

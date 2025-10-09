@@ -1,0 +1,11 @@
+--- charts-original/values.schema.json
++++ charts/values.schema.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "https://json-schema.org/draft/2019-09/schema",
+   "type": "object",
+-  "additionalProperties": false,
++  "additionalProperties": true,
+   "description": "Configurable parameters of the AWS EBS CSI Driver",
+   "properties": {
+     "global": {

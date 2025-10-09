@@ -1,0 +1,5 @@
+# Local chart - no upstream source
+# This chart is maintained locally in this repository
+url: local
+version: 1.0.0
+doNotRelease: true

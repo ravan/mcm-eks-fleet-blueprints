@@ -2,3 +2,5 @@
 bin/
 ref_docs/
 research/
+.specify/
+specs/

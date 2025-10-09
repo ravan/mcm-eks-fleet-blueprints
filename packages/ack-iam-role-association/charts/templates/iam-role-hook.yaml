@@ -1,0 +1,148 @@
+{{- if .Values.enabled }}
+{{- $assumeRolePolicy := include "ack-iam-role-association.assumeRolePolicyDocument" . }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ack-iam-role-association.fullname" . }}-create-role
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "{{ add .Values.hook.weight 5 }}"  # Execute after RBAC setup
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-iam-role-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iam-role-hook
+spec:
+  backoffLimit: {{ .Values.hook.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.hook.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "ack-iam-role-association.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: iam-role-hook
+    spec:
+      serviceAccountName: {{ include "ack-iam-role-association.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+        - name: create-iam-role
+          image: {{ .Values.hook.image }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              RESOURCE_NAME="{{ include "ack-iam-role-association.roleCrdName" . }}"
+              NAMESPACE="{{ .Release.Namespace }}"
+              IAM_ROLE_NAME="{{ .Values.iamRole.name }}"
+              IAM_PATH="{{ .Values.iamRole.path }}"
+              DESCRIPTION="{{ .Values.iamRole.description }}"
+              MAX_SESSION_DURATION="{{ .Values.iamRole.maxSessionDuration }}"
+
+              echo "=== Creating IAM Role via ACK ==="
+              echo "CRD Resource Name: $RESOURCE_NAME"
+              echo "Namespace: $NAMESPACE"
+              echo "IAM Role Name: $IAM_ROLE_NAME"
+              echo "IAM Path: $IAM_PATH"
+              echo "Max Session Duration: $MAX_SESSION_DURATION"
+              echo ""
+
+              # Create the ACK IAM Role CRD
+              echo "Creating ACK IAM Role CRD..."
+              cat <<'EOF' | kubectl apply -f -
+              apiVersion: iam.services.k8s.aws/v1alpha1
+              kind: Role
+              metadata:
+                name: {{ include "ack-iam-role-association.roleCrdName" . }}
+                namespace: {{ .Release.Namespace }}
+                labels:
+{{ include "ack-iam-role-association.labels" . | nindent 18 }}
+                  app.kubernetes.io/component: iam-role
+              spec:
+                name: {{ .Values.iamRole.name }}
+                {{- if .Values.iamRole.path }}
+                path: {{ .Values.iamRole.path }}
+                {{- end }}
+                {{- if .Values.iamRole.description }}
+                description: {{ .Values.iamRole.description | quote }}
+                {{- end }}
+                assumeRolePolicyDocument: {{ $assumeRolePolicy | quote }}
+                {{- if .Values.iamRole.policies }}
+                policies:
+                  {{- range .Values.iamRole.policies }}
+                  - {{ . }}
+                  {{- end }}
+                {{- end }}
+                {{- if .Values.iamRole.inlinePolicies }}
+                inlinePolicies:
+                  {{- range $name, $policy := .Values.iamRole.inlinePolicies }}
+                  {{ $name }}: {{ $policy | quote }}
+                  {{- end }}
+                {{- end }}
+                {{- if .Values.iamRole.maxSessionDuration }}
+                maxSessionDuration: {{ .Values.iamRole.maxSessionDuration }}
+                {{- end }}
+                {{- if .Values.iamRole.tags }}
+                tags:
+                  {{- range .Values.iamRole.tags }}
+                  - key: {{ .key | quote }}
+                    value: {{ .value | quote }}
+                  {{- end }}
+                {{- end }}
+              EOF
+
+              echo "✓ IAM Role CRD created"
+              echo ""
+
+              # Wait for the CRD to be reconciled by ACK IAM Controller
+              echo "=== Waiting for IAM Role to be reconciled by ACK IAM Controller ==="
+              MAX_ATTEMPTS=60  # 5 minutes (60 attempts * 5 seconds)
+              ATTEMPT=0
+
+              while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+                ATTEMPT=$((ATTEMPT + 1))
+
+                # Check if status.ackResourceMetadata.arn exists (indicates successful reconciliation)
+                ROLE_ARN=$(kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE \
+                  -o jsonpath='{.status.ackResourceMetadata.arn}' 2>/dev/null || echo "")
+
+                if [ -n "$ROLE_ARN" ]; then
+                  echo "✓ IAM Role reconciled successfully!"
+                  echo "Role ARN: $ROLE_ARN"
+                  echo ""
+
+                  # Additional wait for IAM eventual consistency
+                  echo "Waiting 10 seconds for IAM role propagation (AWS eventual consistency)..."
+                  sleep 10
+                  echo "✓ IAM Role ready for use"
+                  exit 0
+                fi
+
+                # Check for reconciliation errors
+                SYNCED_STATUS=$(kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE \
+                  -o jsonpath='{.status.conditions[?(@.type=="ACK.ResourceSynced")].status}' 2>/dev/null || echo "")
+
+                if [ "$SYNCED_STATUS" = "False" ]; then
+                  echo "WARNING: ACK reconciliation failed. Checking conditions..."
+                  kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE -o jsonpath='{.status.conditions}' | jq '.' || true
+                fi
+
+                if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                  echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Role not yet reconciled, waiting 5 seconds..."
+                  sleep 5
+                else
+                  echo "ERROR: IAM Role was not reconciled after $MAX_ATTEMPTS attempts (5 minutes)"
+                  echo ""
+                  echo "Current CRD status:"
+                  kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE -o yaml || true
+                  echo ""
+                  echo "Troubleshooting:"
+                  echo "1. Check ACK IAM Controller is running: kubectl get pods -n ack-system -l k8s-app=ack-iam-controller"
+                  echo "2. Check ACK IAM Controller logs: kubectl logs -n ack-system -l k8s-app=ack-iam-controller"
+                  echo "3. Verify ACK IAM Controller has IAM permissions to create roles"
+                  echo "4. Check if IAM role name conflicts with existing role: aws iam get-role --role-name $IAM_ROLE_NAME"
+                  exit 1
+                fi
+              done
+{{- end }}

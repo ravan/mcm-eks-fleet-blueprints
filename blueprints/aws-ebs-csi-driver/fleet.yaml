@@ -1,0 +1,197 @@
+# Fleet Bundle for AWS EBS CSI Driver
+# Purpose: GitOps deployment configuration for multi-cluster EBS CSI Driver rollout with automatic IAM role provisioning
+
+# Default namespace for all resources (CSI drivers typically deploy to kube-system)
+defaultNamespace: kube-system
+
+helm:
+  # Helm chart name from repository
+  chart: aws-ebs-csi-driver
+
+  # Helm repository URL (GitHub Pages hosting built charts)
+  repo: https://ravan.github.io/mcm-eks-fleet-blueprints/
+
+  # Chart version with package iteration (format: <upstream-version>.<package-version>+up<upstream-version>)
+  version: 2.50.1+up2.50.0
+
+  # Helm release name in target clusters
+  releaseName: aws-ebs-csi-driver
+
+# Per-cluster customizations based on Fleet cluster labels
+targetCustomizations:
+  - name: ebs-enabled-clusters
+    # Only deploy to clusters with this label
+    clusterSelector:
+      matchLabels:
+        addon-aws-ebs-csi-driver: "true"
+
+    helm:
+      values:
+        # =================================================================
+        # Cluster-Specific Values from Fleet Labels
+        # =================================================================
+        # Use 'index' function for labels with hyphens (cluster-name, aws-region, etc.)
+        # Use 'quote' filter for numeric values like AWS account ID
+
+        # Cluster name for pod identity association
+        clusterName: ${ index .ClusterLabels "cluster-name" }
+
+        # AWS region for API calls
+        awsRegion: ${ index .ClusterLabels "aws-region" }
+
+        # AWS account ID for role ARN construction
+        awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
+
+        # =================================================================
+        # IAM Role Configuration (ack-iam-role-association subchart)
+        # =================================================================
+        # This subchart uses Helm hooks (weight -10) to create IAM roles via ACK
+        # BEFORE the driver pods start, ensuring zero authentication failures
+        ack-iam-role-association:
+          # Short name to avoid Kubernetes 63-char limit for resource names
+          fullnameOverride: "ebs-iam-role"
+          enabled: true
+          controllerName: aws-ebs-csi-driver
+
+          iamRole:
+            # IAM role name (configurable via cluster label with default fallback)
+            # Use 'default' function to provide default value if label is missing
+            name: ${ default "MCMAWSEBSCSIDriverRole" (get .ClusterLabels "aws-ebs-csi-driver-role-name") }
+
+            # Human-readable description
+            description: "IAM role for AWS EBS CSI Driver with pod identity authentication (managed by Fleet)"
+
+            # Trust policy for EKS pod identity (allows pods.eks.amazonaws.com to assume role)
+            trustPolicy:
+              servicePrincipal: pods.eks.amazonaws.com
+              actions:
+                - "sts:AssumeRole"
+                - "sts:TagSession"
+
+            # AWS-managed policy ARNs to attach (EBS CSI Driver permissions)
+            policies:
+              - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+
+            # Maximum session duration (1-12 hours in seconds)
+            maxSessionDuration: 3600
+
+            # Tags for cost tracking and organization
+            tags:
+              - key: "managed-by"
+                value: "fleet"
+              - key: "component"
+                value: "aws-ebs-csi-driver"
+              - key: "cluster"
+                value: ${ index .ClusterLabels "cluster-name" }
+
+          # Helm hook configuration (weight -10 ensures IAM role exists before pod identity)
+          hook:
+            weight: -10
+            backoffLimit: 10
+            ttlSecondsAfterFinished: 86400  # 24 hours for debugging
+            image: alpine/k8s:1.29.2
+
+        # =================================================================
+        # Pod Identity Configuration (ack-pod-identity-association subchart)
+        # =================================================================
+        # This subchart uses Helm hooks (weight -5) to create pod identity associations
+        # AFTER IAM role creation (weight -10) but BEFORE driver deployment (weight 0)
+        ack-pod-identity-association:
+          enabled: true
+          controllerName: aws-ebs-csi-driver
+
+          podIdentity:
+            # Enable pod identity association creation
+            enabled: true
+
+            # PodIdentityAssociation resource name
+            name: aws-ebs-csi-driver-pod-identity
+
+            # EKS cluster name (from Fleet cluster label)
+            clusterName: ${ index .ClusterLabels "cluster-name" }
+
+            # AWS account ID for role ARN construction (quoted for numeric handling)
+            awsAccountId: ${ index .ClusterLabels "aws-account-id" | quote }
+
+            # IAM role name (must match ack-iam-role-association.iamRole.name)
+            roleName: ${ default "MCMAWSEBSCSIDriverRole" (get .ClusterLabels "aws-ebs-csi-driver-role-name") }
+
+            # Service account name created by upstream EBS CSI Driver chart
+            serviceAccountName: ebs-csi-controller-sa
+
+            # Namespace where service account exists (matches defaultNamespace)
+            namespace: kube-system
+
+          # Helm hook configuration (weight -5 executes after IAM role hook)
+          hook:
+            bootstrap:
+              backoffLimit: 10
+              ttlSecondsAfterFinished: 86400  # 24 hours for debugging
+              image: alpine/k8s:1.29.2
+
+        # =================================================================
+        # EBS CSI Driver Configuration (upstream chart values)
+        # =================================================================
+
+        # Controller configuration (pod deployment for volume provisioning)
+        controller:
+          serviceAccount:
+            # Reuse service account name from upstream chart
+            # MUST match podIdentity.serviceAccountName above for pod identity to work
+            create: true
+            name: ebs-csi-controller-sa
+            # NO IRSA annotations - pod identity authentication only
+            # Annotations are kept empty (no eks.amazonaws.com/role-arn)
+            annotations: {}
+
+          # Number of controller replicas (HA deployment)
+          replicaCount: 2
+
+          # Resource requests and limits for controller pods
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # Node DaemonSet configuration (runs on every node for volume attachment)
+        node:
+          serviceAccount:
+            create: true
+            name: ebs-csi-node-sa
+            # Node pods don't need AWS API access, no pod identity required
+            annotations: {}
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # StorageClass configuration (gp3 as default for cost efficiency)
+        storageClasses:
+          - name: gp3
+            # Mark as default storage class (automatically used for PVCs without storageClassName)
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+            # WaitForFirstConsumer delays volume provisioning until pod is scheduled
+            # Ensures EBS volume is created in the same AZ as the pod
+            volumeBindingMode: WaitForFirstConsumer
+            # Allow volume expansion (resize PVCs without data loss)
+            allowVolumeExpansion: true
+            # Volume parameters
+            parameters:
+              type: gp3  # gp3 is more cost-effective than gp2
+              encrypted: "true"  # Encrypt all volumes at rest
+
+# =================================================================
+# Fleet Bundle Dependencies
+# =================================================================
+# Ensure ACK IAM Controller is deployed before this bundle
+# ACK IAM Controller provides Role CRD reconciliation (creates IAM roles in AWS)
+dependsOn:
+  - name: ack-iam-controller-blueprints-ack-iam-controller

@@ -1,0 +1,4 @@
+url: https://github.com/kubernetes-sigs/aws-ebs-csi-driver.git
+subdirectory: charts/aws-ebs-csi-driver
+packageVersion: 1
+commit: f6dea06f1916b5d30d12df9e68d77241a2c72896  # tag: v1.50.1

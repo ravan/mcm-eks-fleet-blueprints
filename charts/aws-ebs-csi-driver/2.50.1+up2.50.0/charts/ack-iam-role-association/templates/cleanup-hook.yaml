@@ -1,0 +1,58 @@
+{{- if .Values.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ack-iam-role-association.fullname" . }}-cleanup-role
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "5"  # Execute after RBAC setup
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-iam-role-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cleanup-hook
+spec:
+  backoffLimit: {{ .Values.hook.cleanup.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.hook.cleanup.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "ack-iam-role-association.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cleanup-hook
+    spec:
+      serviceAccountName: {{ include "ack-iam-role-association.cleanup.serviceAccountName" . }}
+      restartPolicy: Never
+      containers:
+        - name: cleanup-iam-role
+          image: {{ .Values.hook.cleanup.image }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              RESOURCE_NAME="{{ include "ack-iam-role-association.roleCrdName" . }}"
+              NAMESPACE="{{ .Release.Namespace }}"
+
+              echo "=== Cleaning up IAM Role CRD ==="
+              echo "CRD Resource Name: $RESOURCE_NAME"
+              echo "Namespace: $NAMESPACE"
+              echo ""
+
+              # Check if the IAM Role CRD exists
+              if kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE >/dev/null 2>&1; then
+                echo "Deleting IAM Role CRD..."
+                kubectl delete role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE --ignore-not-found=true
+
+                echo "✓ IAM Role CRD deletion initiated"
+                echo ""
+                echo "Note: ACK IAM Controller will delete the AWS IAM role asynchronously"
+                echo "      The role will remain in AWS until all dependencies are removed"
+              else
+                echo "IAM Role CRD not found - nothing to clean up"
+              fi
+
+              echo "✓ Cleanup complete"
+              exit 0
+{{- end }}

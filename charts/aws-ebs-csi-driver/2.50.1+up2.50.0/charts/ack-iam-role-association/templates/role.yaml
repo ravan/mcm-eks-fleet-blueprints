@@ -1,0 +1,40 @@
+{{- if .Values.enabled }}
+---
+# Role for IAM role creation hook (RBAC permissions to manage ACK IAM Role CRDs)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ack-iam-role-association.fullname" . }}-iam-role-manager
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "{{ .Values.hook.weight }}"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-iam-role-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: iam-role-hook
+rules:
+  # Permissions to manage ACK IAM Role CRDs
+  - apiGroups: ["iam.services.k8s.aws"]
+    resources: ["roles"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+# Role for cleanup hook (RBAC permissions to delete ACK IAM Role CRDs)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ack-iam-role-association.fullname" . }}-cleanup-manager
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    {{- include "ack-iam-role-association.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cleanup-hook
+rules:
+  # Permissions to delete ACK IAM Role CRDs
+  - apiGroups: ["iam.services.k8s.aws"]
+    resources: ["roles"]
+    verbs: ["get", "list", "delete"]
+{{- end }}

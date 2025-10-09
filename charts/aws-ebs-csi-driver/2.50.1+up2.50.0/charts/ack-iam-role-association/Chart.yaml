@@ -1,0 +1,15 @@
+apiVersion: v2
+appVersion: 1.0.0
+description: Reusable Helm chart for creating ACK IAM Role CRDs with pod identity
+  trust policies
+keywords:
+- aws
+- iam
+- ack
+- pod-identity
+- ebs
+maintainers:
+- name: MCM Platform Team
+name: ack-iam-role-association
+type: application
+version: 1.0.0
