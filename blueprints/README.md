@@ -10,7 +10,9 @@ blueprints/
 │   └── all-eks-clusters.yaml
 ├── gitrepos/                # GitRepo resources for Fleet
 │   ├── pod-identity-agent-repo.yaml
-│   └── ack-controllers-repo.yaml
+│   ├── ack-eks-controller-repo.yaml
+│   ├── ack-iam-controller-repo.yaml
+│   └── aws-ebs-csi-driver-repo.yaml
 ├── pod-identity-agent/      # Bundle 0: EKS Pod Identity Agent
 │   ├── fleet.yaml
 │   └── README.md
@@ -18,6 +20,9 @@ blueprints/
 │   ├── fleet.yaml
 │   └── README.md
 ├── ack-iam-controller/      # Bundle 2: ACK IAM Controller
+│   ├── fleet.yaml
+│   └── README.md
+├── aws-ebs-csi-driver/      # Bundle 3: AWS EBS CSI Driver
 │   ├── fleet.yaml
 │   └── README.md
 └── README.md
@@ -52,6 +57,18 @@ Deploys the ACK IAM controller which manages IAM resources (roles, policies, use
 **Pod Identity**: Created declaratively via PodIdentityAssociation CRD by `ack-pod-identity-association` subchart
 
 **Dependencies**: Bundle 1
+
+### Bundle 3: AWS EBS CSI Driver
+
+Deploys the AWS EBS CSI Driver which enables dynamic provisioning of Amazon EBS volumes for Kubernetes persistent storage.
+
+**Source**: Helm repository (`aws-ebs-csi-driver` with `ack-iam-role-association` and `ack-pod-identity-association` subcharts)
+
+**IAM Role & Pod Identity**: Created declaratively via Helm hooks - IAM role via ACK IAM Controller (weight -10), pod identity via ACK EKS Controller (weight -5)
+
+**Dependencies**: Bundle 2
+
+**Targeting**: Deployed only to clusters with `addon-aws-ebs-csi-driver=true` label
 
 ## Architecture: Multi-Stage Deployment
 
@@ -105,7 +122,9 @@ Deploys the ACK IAM controller which manages IAM resources (roles, policies, use
    ```bash
    # Update repo URL in gitrepos/*.yaml first!
    kubectl apply -f blueprints/gitrepos/pod-identity-agent-repo.yaml
-   kubectl apply -f blueprints/gitrepos/ack-controllers-repo.yaml
+   kubectl apply -f blueprints/gitrepos/ack-eks-controller-repo.yaml
+   kubectl apply -f blueprints/gitrepos/ack-iam-controller-repo.yaml
+   kubectl apply -f blueprints/gitrepos/aws-ebs-csi-driver-repo.yaml
    ```
 
 Fleet automatically deploys all bundles in order with proper dependency management.
@@ -129,6 +148,8 @@ Clusters must be labeled in Rancher with:
 | `aws-account-id` | AWS account ID | `123456789012` |
 | `ack-iam-role-name` | ACK IAM controller role name (not full ARN) | `ACKIAMControllerRole` |
 | `ack-eks-role-name` | ACK EKS controller role name (not full ARN) | `ACKEKSControllerRole` |
+| `aws-ebs-csi-driver-role-name` | AWS EBS CSI Driver role name (optional, default: MCMAWSEBSCSIDriverRole) | `CustomEBSRole` |
+| `addon-aws-ebs-csi-driver` | Enable AWS EBS CSI Driver deployment (optional) | `"true"` |
 
 **Note**: Fleet will automatically construct the full IAM role ARNs from the account ID and role names.
 Format: `arn:aws:iam::{aws-account-id}:role/{role-name}`
@@ -168,7 +189,9 @@ Fleet Bundle 1: ACK EKS Controller (with bootstrap hook)
          ↓
 Fleet Bundle 2: ACK IAM Controller (with bootstrap hook)
          ↓
-Additional Controllers (optional)
+Fleet Bundle 3: AWS EBS CSI Driver (with IAM role + pod identity hooks)
+         ↓
+Additional ACK Controllers & AWS Addons (optional)
 ```
 
 ## Implementation Pattern
@@ -213,6 +236,12 @@ kubectl get podidentityassociations -A
 
 # Check IAM Roles (via ACK CRDs)
 kubectl get roles.iam.services.k8s.aws -A
+
+# Check AWS EBS CSI Driver
+kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver
+
+# Check Storage Classes
+kubectl get storageclass
 ```
 
 ## Troubleshooting
@@ -247,6 +276,72 @@ kubectl describe podidentityassociation -n ack-system
 ```
 
 Ensure ACK EKS controller is running and cluster labels are correct.
+
+### AWS EBS CSI Driver Issues
+
+**Bundle Not Deploying**:
+- Verify cluster has `addon-aws-ebs-csi-driver=true` label
+- Check ACK IAM Controller dependency is ready (Bundle 2 must be deployed first)
+- Check bundle status: `kubectl describe bundle -n fleet-default <aws-ebs-csi-driver-bundle-name>`
+
+**IAM Role Creation Failed** (Helm hook weight -10):
+```bash
+# Check hook job logs
+kubectl logs -n kube-system job/<release-name>-iam-role-create-role
+
+# Check IAM Role CRD status
+kubectl get role.iam.services.k8s.aws -n kube-system
+kubectl describe role.iam.services.k8s.aws -n kube-system <role-name>
+```
+
+Common causes:
+- ACK IAM Controller lacks permissions to create IAM roles
+- IAM role name conflicts with existing role
+- Policy ARN incorrect or doesn't exist
+
+**Pod Identity Association Failed** (Helm hook weight -5):
+```bash
+# Check PodIdentityAssociation CRD
+kubectl get podidentityassociation.eks.services.k8s.aws -n kube-system
+kubectl describe podidentityassociation.eks.services.k8s.aws -n kube-system <assoc-name>
+```
+
+Common causes:
+- IAM role not created (check hook execution order)
+- Service account name mismatch (must be `ebs-csi-controller-sa`)
+- ACK EKS Controller not running or not reconciling
+
+**Driver Pods Not Starting**:
+```bash
+# Check controller pods
+kubectl get pods -n kube-system -l app=ebs-csi-controller
+kubectl logs -n kube-system -l app=ebs-csi-controller -c ebs-plugin
+
+# Check node pods (DaemonSet)
+kubectl get pods -n kube-system -l app=ebs-csi-node
+```
+
+Common causes:
+- Pod identity association missing (check hook execution)
+- IAM role lacks EBS permissions (AmazonEBSCSIDriverPolicy)
+- AWS credentials not working (check pod logs for auth errors)
+
+**PVC Stuck Pending**:
+```bash
+# Check PVC events
+kubectl describe pvc <pvc-name>
+
+# Check provisioner logs
+kubectl logs -n kube-system -l app=ebs-csi-controller -c csi-provisioner
+```
+
+Common causes:
+- Storage class not found or not default
+- EBS quota exceeded in AWS region
+- Node not running (VolumeBindingMode: WaitForFirstConsumer)
+- IAM permissions missing for volume creation
+
+For detailed troubleshooting, see `blueprints/aws-ebs-csi-driver/README.md`.
 
 ## Architecture Notes
 
