@@ -151,6 +151,11 @@ targetCustomizations:
         # EBS CSI Driver Configuration (upstream chart values)
         # =================================================================
 
+        # Disable nodeAllocatableUpdatePeriodSeconds until MutableCSINodeAllocatableCount feature gate is enabled
+        # This field was added in chart v2.46.0 for Kubernetes 1.33+ but requires the feature gate
+        # Without the feature gate, Kubernetes strips this field causing Fleet to detect drift
+        nodeAllocatableUpdatePeriodSeconds: null
+
         # Controller configuration (pod deployment for volume provisioning)
         controller:
           serviceAccount:
