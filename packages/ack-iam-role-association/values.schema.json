@@ -1,0 +1,237 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ACK IAM Role Association Helm Chart Values",
+  "description": "Configuration schema for ack-iam-role-association chart - creates IAM roles via ACK IAM Controller for EKS Pod Identity",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "description": "Enable IAM role creation via this chart",
+      "default": true
+    },
+    "controllerName": {
+      "type": "string",
+      "description": "Name of the controller using this IAM role (used for labeling resources)",
+      "default": "ack-controller",
+      "examples": ["aws-ebs-csi-driver", "aws-efs-csi-driver", "aws-load-balancer-controller"]
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full name of resources (useful to avoid 63-char Kubernetes name limit)",
+      "examples": ["ebs-iam-role", "efs-iam-role"]
+    },
+    "iamRole": {
+      "type": "object",
+      "description": "Configuration for the AWS IAM role to create",
+      "required": ["name", "policies"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "IAM role name in AWS (must be unique within AWS account)",
+          "pattern": "^[a-zA-Z0-9+=,.@_-]{1,64}$",
+          "examples": ["MCMAWSEBSCSIDriverRole", "CustomServiceRole", "SharedClusterRole"]
+        },
+        "path": {
+          "type": "string",
+          "description": "IAM path for organizational hierarchy",
+          "pattern": "^/([a-zA-Z0-9+=,.@_-]+/)*$",
+          "default": "/",
+          "examples": ["/", "/service-roles/", "/mcm/controllers/"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description for the IAM role",
+          "default": "IAM role created by ack-iam-role-association",
+          "maxLength": 1000,
+          "examples": [
+            "IAM role for AWS EBS CSI Driver with pod identity authentication",
+            "Custom role for S3 access via EKS Pod Identity"
+          ]
+        },
+        "trustPolicy": {
+          "type": "object",
+          "description": "Trust policy configuration for EKS Pod Identity",
+          "properties": {
+            "servicePrincipal": {
+              "type": "string",
+              "description": "AWS service principal allowed to assume the role",
+              "default": "pods.eks.amazonaws.com",
+              "enum": ["pods.eks.amazonaws.com"]
+            },
+            "actions": {
+              "type": "array",
+              "description": "Actions allowed in the assume role policy",
+              "default": ["sts:AssumeRole", "sts:TagSession"],
+              "items": {
+                "type": "string",
+                "enum": ["sts:AssumeRole", "sts:TagSession", "sts:SetSourceIdentity"]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
+        },
+        "policies": {
+          "type": "array",
+          "description": "List of AWS managed policy ARNs to attach to the role",
+          "items": {
+            "type": "string",
+            "pattern": "^arn:aws:iam::(aws|[0-9]{12}):policy/.+$",
+            "examples": [
+              "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+              "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+              "arn:aws:iam::123456789012:policy/CustomPolicy"
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "inlinePolicies": {
+          "type": "object",
+          "description": "Map of inline policy names to JSON policy documents",
+          "additionalProperties": {
+            "type": "string",
+            "description": "JSON policy document as a string"
+          },
+          "examples": [
+            {
+              "S3WriteAccess": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:PutObject\"],\"Resource\":\"arn:aws:s3:::bucket/*\"}]}"
+            }
+          ]
+        },
+        "maxSessionDuration": {
+          "type": "integer",
+          "description": "Maximum session duration for the role (in seconds, 1-12 hours)",
+          "default": 3600,
+          "minimum": 3600,
+          "maximum": 43200,
+          "examples": [3600, 7200, 43200]
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for cost tracking and organization",
+          "items": {
+            "type": "object",
+            "required": ["key", "value"],
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Tag key",
+                "minLength": 1,
+                "maxLength": 128,
+                "examples": ["managed-by", "environment", "component"]
+              },
+              "value": {
+                "type": "string",
+                "description": "Tag value",
+                "minLength": 0,
+                "maxLength": 256,
+                "examples": ["fleet", "production", "aws-ebs-csi-driver"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "hook": {
+      "type": "object",
+      "description": "Configuration for Helm hook jobs that create IAM roles",
+      "properties": {
+        "weight": {
+          "type": "integer",
+          "description": "Helm hook weight (controls execution order, -10 recommended for IAM role hooks)",
+          "default": -10,
+          "minimum": -100,
+          "maximum": 100
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "description": "Number of retries for failed hook jobs",
+          "default": 10,
+          "minimum": 0,
+          "maximum": 20
+        },
+        "ttlSecondsAfterFinished": {
+          "type": "integer",
+          "description": "Time to keep completed hook jobs for debugging (in seconds)",
+          "default": 86400,
+          "minimum": 0,
+          "examples": [300, 3600, 86400]
+        },
+        "image": {
+          "type": "string",
+          "description": "Container image with kubectl for hook execution",
+          "default": "alpine/k8s:1.29.2",
+          "pattern": "^[a-z0-9./_-]+:[a-z0-9._-]+$",
+          "examples": ["alpine/k8s:1.29.2", "bitnami/kubectl:1.29"]
+        },
+        "serviceAccountName": {
+          "type": "string",
+          "description": "Service account name for hook job RBAC (auto-generated if empty)",
+          "default": "",
+          "examples": ["ack-iam-role-hook-sa"]
+        },
+        "cleanup": {
+          "type": "object",
+          "description": "Configuration for pre-delete cleanup hook",
+          "properties": {
+            "backoffLimit": {
+              "type": "integer",
+              "description": "Number of retries for cleanup job",
+              "default": 3,
+              "minimum": 0
+            },
+            "ttlSecondsAfterFinished": {
+              "type": "integer",
+              "description": "Time to keep cleanup job (shorter than create hook)",
+              "default": 300,
+              "minimum": 0
+            },
+            "image": {
+              "type": "string",
+              "description": "Container image for cleanup hook",
+              "default": "alpine/k8s:1.29.2"
+            },
+            "serviceAccountName": {
+              "type": "string",
+              "description": "Service account for cleanup job",
+              "default": ""
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["iamRole"],
+  "examples": [
+    {
+      "enabled": true,
+      "controllerName": "aws-ebs-csi-driver",
+      "iamRole": {
+        "name": "MCMAWSEBSCSIDriverRole",
+        "description": "IAM role for AWS EBS CSI Driver with pod identity",
+        "policies": [
+          "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+        ],
+        "tags": [
+          {"key": "managed-by", "value": "fleet"},
+          {"key": "component", "value": "aws-ebs-csi-driver"}
+        ]
+      }
+    },
+    {
+      "enabled": true,
+      "controllerName": "custom-s3-app",
+      "iamRole": {
+        "name": "CustomS3AccessRole",
+        "description": "Custom IAM role for S3 access",
+        "policies": [
+          "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+        ],
+        "inlinePolicies": {
+          "S3WriteAccess": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:PutObject\",\"s3:DeleteObject\"],\"Resource\":\"arn:aws:s3:::my-bucket/*\"}]}"
+        }
+      }
+    }
+  ]
+}

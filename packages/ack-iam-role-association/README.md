@@ -19,6 +19,8 @@ This chart provides a reusable pattern for creating AWS IAM roles via ACK (AWS C
 
 ## Architecture
 
+### Deployment Flow
+
 ```
 Helm Install/Upgrade Triggered
 │
@@ -35,6 +37,118 @@ Helm Install/Upgrade Triggered
 └─ On Chart Delete: Cleanup Hook
     └─ Deletes ACK IAM Role CRD (ACK controller deletes AWS role)
 ```
+
+### Dependency Diagram
+
+This diagram shows how `ack-iam-role-association` fits into the broader AWS service integration pattern:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Fleet GitRepo (Git Repository)                      │
+│                 Monitors: blueprints/<service>/fleet.yaml                │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ syncs to
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Fleet Bundle (Helm Chart Reference)                   │
+│              dependsOn: ack-iam-controller-blueprints-...               │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ deploys
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                  Helm Chart (<service>-<version>.tgz)                    │
+│                                                                           │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ Subchart: ack-iam-role-association (weight -10)                  │  │
+│  │   ├─ ServiceAccount (RBAC)                                       │  │
+│  │   ├─ Role (RBAC for CRD access)                                  │  │
+│  │   ├─ RoleBinding (RBAC)                                          │  │
+│  │   ├─ Hook Job (pre-install/pre-upgrade)                          │  │
+│  │   │   └─ Creates ACK IAM Role CRD                                │  │
+│  │   └─ Cleanup Hook Job (pre-delete)                               │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                 │                                         │
+│                                 │ creates                                 │
+│                                 ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ ACK IAM Role CRD (iam.services.k8s.aws/v1alpha1)                 │  │
+│  │   metadata:                                                       │  │
+│  │     name: <service>-iam-role                                     │  │
+│  │   spec:                                                           │  │
+│  │     name: MCM<Service>Role  ← IAM role name in AWS              │  │
+│  │     policies: [arn:aws:iam::aws:policy/...]                      │  │
+│  │     assumeRolePolicyDocument: {pods.eks.amazonaws.com}           │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                 │                                         │
+└─────────────────────────────────┼─────────────────────────────────────────┘
+                                  │ watched by
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   ACK IAM Controller (ack-system)                        │
+│                 Reconciles Role CRDs → AWS IAM Roles                     │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ creates/updates
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      AWS IAM Role (AWS Account)                          │
+│                  Name: MCM<Service>Role                                  │
+│                  Trust Policy: pods.eks.amazonaws.com                    │
+│                  Attached Policies: [AmazonEBSCSIDriverPolicy, ...]      │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ referenced by
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│         Subchart: ack-pod-identity-association (weight -5)               │
+│           Creates PodIdentityAssociation CRD                             │
+│           Links: ServiceAccount → IAM Role ARN                           │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │ enables
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                Application Pods (weight 0, default)                      │
+│                ServiceAccount: <service>-sa                              │
+│                Namespace: <namespace>                                    │
+│                  │                                                        │
+│                  │ authenticated via                                     │
+│                  ▼                                                        │
+│              EKS Pod Identity Agent (DaemonSet)                          │
+│                  │                                                        │
+│                  │ assumes role                                          │
+│                  ▼                                                        │
+│            AWS APIs (EBS, EFS, S3, etc.)                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Key Relationships:
+═════════════════
+
+1. **Fleet Bundle** → depends on → **ACK IAM Controller Bundle**
+2. **Helm Chart** → includes → **ack-iam-role-association subchart**
+3. **Hook Job** → creates → **ACK IAM Role CRD**
+4. **ACK IAM Controller** → watches → **Role CRDs**
+5. **ACK IAM Controller** → creates → **AWS IAM Role**
+6. **Pod Identity Subchart** → references → **IAM Role ARN**
+7. **Application Pods** → use → **Pod Identity** → assumes → **IAM Role**
+
+Critical Path for Zero Auth Failures:
+════════════════════════════════════
+
+Weight -10: IAM Role Created ✅
+    ↓
+Weight -5: Pod Identity Association Created ✅
+    ↓
+Weight 0: Application Pods Start ✅ (authentication ready)
+```
+
+### Integration Pattern
+
+When adding this chart to a new AWS service package:
+
+1. **Add as dependency**: Create `generated-changes/dependencies/ack-iam-role-association/dependency.yaml`
+2. **Configure in Fleet bundle**: Set IAM role name, policies, and hook weight in `fleet.yaml`
+3. **Rebuild package**: Run `charts-build-scripts prepare → patch → charts`
+4. **Deploy via Fleet**: GitRepo syncs bundle to target clusters
+
+See `INTEGRATION.md` for detailed step-by-step guide.
 
 ## Values Schema
 
@@ -282,6 +396,69 @@ Ensure hook weights follow the pattern:
 - ACK IAM Controller handles idempotency (first cluster creates, others verify)
 - IAM role persists in AWS until **all** clusters delete their CRDs
 - Use shared role strategy to avoid AWS IAM role limits
+
+### Validation and Error Handling
+
+The hook job includes comprehensive validation and error handling:
+
+#### Pre-Creation Validation
+
+- **Policy ARN Format**: Validates managed policy ARNs match expected format (`arn:aws:iam::...`)
+- **Idempotency Check**: Detects if Role CRD already exists and performs update instead of create
+- **Reconciliation Status**: Shows existing role ARN if already reconciled
+
+#### Runtime Error Detection
+
+The hook monitors ACK controller reconciliation status and provides specific troubleshooting for common failures:
+
+- **AccessDenied/Unauthorized**: ACK IAM Controller lacks required IAM permissions
+  - Lists required IAM permissions (`iam:CreateRole`, `iam:AttachRolePolicy`, etc.)
+  - Provides AWS CLI commands to check controller's IAM role
+  - **Action**: Hook fails immediately (no retry) - fix IAM permissions first
+
+- **EntityAlreadyExists**: IAM role already exists in AWS from another source
+  - Explains possible causes (manual creation, CloudFormation, other ACK instance)
+  - **Action**: Hook continues waiting - ACK will adopt and update the role
+
+- **NoSuchEntity/Policy Not Found**: Specified policy ARN does not exist
+  - Lists all policy ARNs from configuration
+  - **Action**: Hook fails immediately - verify policy ARNs are correct
+
+- **MalformedPolicyDocument**: Trust policy or inline policy has invalid JSON
+  - **Action**: Hook fails immediately - fix JSON syntax in values.yaml
+
+#### Reconciliation Wait Logic
+
+- **Timeout**: 5 minutes (60 attempts × 5 seconds)
+- **Status Checks**: Monitors `status.ackResourceMetadata.arn` for successful reconciliation
+- **Retry Strategy**: Continues checking until success or timeout
+- **AWS Consistency**: Additional 10-second wait after reconciliation for IAM propagation
+
+#### Troubleshooting Output
+
+On failure, the hook provides:
+
+1. **Error Classification**: Identifies specific failure type
+2. **Root Cause**: Explains why the failure occurred
+3. **Resolution Steps**: Actionable commands to diagnose and fix
+4. **Full CRD Status**: Dumps complete status conditions for debugging
+
+**Example Error Output**:
+
+```
+❌ ERROR: ACK IAM Controller lacks IAM permissions
+
+The ACK IAM Controller does not have sufficient permissions to create/update IAM roles.
+
+Required IAM permissions for ACK IAM Controller:
+  - iam:CreateRole
+  - iam:GetRole
+  - iam:UpdateRole
+  ...
+
+Check ACK IAM Controller's IAM role permissions in AWS console or via:
+  aws iam get-role-policy --role-name <ack-iam-controller-role> --policy-name <policy-name>
+```
 
 ## Reusability
 

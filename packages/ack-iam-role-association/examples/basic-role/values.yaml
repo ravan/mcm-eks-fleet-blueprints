@@ -1,0 +1,77 @@
+# Example: Basic IAM Role with Single Managed Policy
+#
+# This example demonstrates the simplest use case: creating an IAM role
+# with a single AWS-managed policy attached.
+#
+# Use Case: AWS EBS CSI Driver requiring only the standard EBS policy
+#
+# Deploy:
+#   helm install my-ebs-role packages/ack-iam-role-association/charts \
+#     -f packages/ack-iam-role-association/examples/basic-role/values.yaml \
+#     -n ack-system
+
+enabled: true
+
+# Name of the controller/service using this role
+controllerName: aws-ebs-csi-driver
+
+# IAM role configuration
+iamRole:
+  # Role name in AWS (must be unique within account)
+  name: MCMAWSEBSCSIDriverRole
+
+  # Optional: IAM path for organizational hierarchy
+  path: /
+
+  # Human-readable description
+  description: "IAM role for AWS EBS CSI Driver with EKS Pod Identity authentication"
+
+  # Trust policy for EKS Pod Identity (default values shown)
+  trustPolicy:
+    servicePrincipal: pods.eks.amazonaws.com
+    actions:
+      - sts:AssumeRole
+      - sts:TagSession
+
+  # AWS-managed policy to attach
+  policies:
+    - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+
+  # No inline policies needed for basic use case
+  inlinePolicies: {}
+
+  # Session duration (1 hour = 3600 seconds)
+  maxSessionDuration: 3600
+
+  # Tags for cost tracking and organization
+  tags:
+    - key: managed-by
+      value: fleet
+    - key: component
+      value: aws-ebs-csi-driver
+    - key: environment
+      value: production
+
+# Helm hook configuration
+hook:
+  # Weight -10 ensures IAM role is created before pod identity (weight -5)
+  weight: -10
+
+  # Retry up to 10 times on failure
+  backoffLimit: 10
+
+  # Keep job for 24 hours for debugging
+  ttlSecondsAfterFinished: 86400
+
+  # Container image with kubectl
+  image: alpine/k8s:1.29.2
+
+  # Auto-generate service account name
+  serviceAccountName: ""
+
+  # Cleanup hook configuration (for Helm uninstall)
+  cleanup:
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 300  # 5 minutes
+    image: alpine/k8s:1.29.2
+    serviceAccountName: ""

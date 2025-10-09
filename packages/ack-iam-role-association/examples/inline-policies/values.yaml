@@ -1,0 +1,92 @@
+# Example: IAM Role with Custom Inline Policy
+#
+# This example demonstrates creating an IAM role with both a managed policy
+# and a custom inline policy for additional permissions.
+#
+# Use Case: Service requiring S3 read access (managed policy) plus custom
+# write permissions to a specific bucket (inline policy)
+#
+# Deploy:
+#   helm install my-s3-role packages/ack-iam-role-association/charts \
+#     -f packages/ack-iam-role-association/examples/inline-policies/values.yaml \
+#     -n ack-system
+
+enabled: true
+
+# Name of the controller/service using this role
+controllerName: custom-s3-app
+
+# IAM role configuration
+iamRole:
+  # Role name in AWS
+  name: CustomS3AccessRole
+
+  # IAM path
+  path: /service-roles/
+
+  # Description explaining the role's purpose
+  description: "Custom IAM role for S3 access with read (managed) and write (inline) permissions"
+
+  # Trust policy for EKS Pod Identity
+  trustPolicy:
+    servicePrincipal: pods.eks.amazonaws.com
+    actions:
+      - sts:AssumeRole
+      - sts:TagSession
+
+  # AWS-managed policy for S3 read access
+  policies:
+    - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+  # Custom inline policy for S3 write access to specific bucket
+  inlinePolicies:
+    S3WriteAccess: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "S3BucketWriteAccess",
+            "Effect": "Allow",
+            "Action": [
+              "s3:PutObject",
+              "s3:DeleteObject",
+              "s3:PutObjectAcl"
+            ],
+            "Resource": "arn:aws:s3:::my-application-bucket/*"
+          },
+          {
+            "Sid": "S3BucketListAccess",
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket",
+              "s3:GetBucketLocation"
+            ],
+            "Resource": "arn:aws:s3:::my-application-bucket"
+          }
+        ]
+      }
+
+  # Session duration (2 hours for longer-running jobs)
+  maxSessionDuration: 7200
+
+  # Tags
+  tags:
+    - key: managed-by
+      value: fleet
+    - key: application
+      value: custom-s3-app
+    - key: data-classification
+      value: confidential
+
+# Helm hook configuration (same as basic example)
+hook:
+  weight: -10
+  backoffLimit: 10
+  ttlSecondsAfterFinished: 86400
+  image: alpine/k8s:1.29.2
+  serviceAccountName: ""
+  cleanup:
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 300
+    image: alpine/k8s:1.29.2
+    serviceAccountName: ""

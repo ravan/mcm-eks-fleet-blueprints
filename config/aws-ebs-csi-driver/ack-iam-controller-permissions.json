@@ -1,0 +1,76 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ACKIAMControllerRoleManagement",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:GetRole",
+        "iam:UpdateRole",
+        "iam:DeleteRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListRoleTags"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/MCM*",
+        "arn:aws:iam::*:role/ack-*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:ResourceTag/managed-by": "ack-iam-controller"
+        }
+      }
+    },
+    {
+      "Sid": "ACKIAMControllerPolicyAttachment",
+      "Effect": "Allow",
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/MCM*",
+        "arn:aws:iam::*:role/ack-*"
+      ]
+    },
+    {
+      "Sid": "ACKIAMControllerInlinePolicyManagement",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PutRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:ListRolePolicies"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/MCM*",
+        "arn:aws:iam::*:role/ack-*"
+      ]
+    },
+    {
+      "Sid": "ACKIAMControllerReadManagedPolicies",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:ListPolicyVersions"
+      ],
+      "Resource": [
+        "arn:aws:iam::aws:policy/*",
+        "arn:aws:iam::*:policy/*"
+      ]
+    },
+    {
+      "Sid": "ACKIAMControllerListRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListRoles"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

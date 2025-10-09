@@ -72,6 +72,24 @@ targetCustomizations:
             policies:
               - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
 
+            # Optional: Custom inline policies for additional permissions
+            # Uncomment and customize if you need permissions beyond AmazonEBSCSIDriverPolicy
+            # inlinePolicies:
+            #   EBSSnapshotPolicy: |
+            #     {
+            #       "Version": "2012-10-17",
+            #       "Statement": [{
+            #         "Effect": "Allow",
+            #         "Action": [
+            #           "ec2:CreateSnapshot",
+            #           "ec2:DeleteSnapshot",
+            #           "ec2:DescribeSnapshots",
+            #           "ec2:DescribeSnapshotsAttribute"
+            #         ],
+            #         "Resource": "*"
+            #       }]
+            #     }
+
             # Maximum session duration (1-12 hours in seconds)
             maxSessionDuration: 3600
 

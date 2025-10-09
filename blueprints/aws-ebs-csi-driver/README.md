@@ -256,21 +256,159 @@ Common issues:
 
 ### IAM Role Not Created
 
+The IAM role creation hook (weight -10) may fail for several reasons. The hook provides specific error messages for each case:
+
+#### Check Hook Job Status
+
 ```bash
-# Check ACK IAM Controller status
-kubectl get pods -n ack-system -l k8s-app=ack-iam-controller
+# List all jobs in namespace
+kubectl get jobs -n ack-system | grep iam-role
+
+# View hook job logs
+kubectl logs -n ack-system job/ebs-iam-role-create-role
 
 # Check Role CRD status
 kubectl get role.iam.services.k8s.aws -n ack-system
 
-# View Role CRD details
-kubectl describe role.iam.services.k8s.aws -n ack-system <role-name>
+# View Role CRD details and reconciliation status
+kubectl describe role.iam.services.k8s.aws -n ack-system ebs-iam-role
 ```
 
-Common issues:
-- ACK IAM Controller not deployed
-- IAM permissions missing for ACK controller
-- Role name conflict with existing role
+#### Common Failure Scenarios
+
+**1. AccessDenied - ACK IAM Controller Lacks Permissions**
+
+**Error Message**: `❌ ERROR: ACK IAM Controller lacks IAM permissions`
+
+**Root Cause**: The IAM role used by the ACK IAM Controller doesn't have sufficient permissions to create/update IAM roles.
+
+**Resolution**:
+
+1. Check which IAM role the ACK IAM Controller is using:
+   ```bash
+   kubectl get pods -n ack-system -l k8s-app=ack-iam-controller -o yaml | grep -A5 serviceAccountName
+   aws eks describe-pod-identity-association --cluster-name <cluster> --region <region>
+   ```
+
+2. Verify the IAM role has required permissions (see `config/aws-ebs-csi-driver/ack-iam-controller-permissions.json`):
+   ```bash
+   aws iam list-attached-role-policies --role-name <ack-iam-controller-role>
+   aws iam get-role-policy --role-name <ack-iam-controller-role> --policy-name <inline-policy-name>
+   ```
+
+3. Add missing permissions to the ACK IAM Controller's IAM role:
+   - `iam:CreateRole`
+   - `iam:GetRole`
+   - `iam:UpdateRole`
+   - `iam:AttachRolePolicy`
+   - `iam:UpdateAssumeRolePolicy`
+   - `iam:TagRole`
+
+**2. Policy ARN Not Found**
+
+**Error Message**: `❌ ERROR: Managed policy ARN not found`
+
+**Root Cause**: One or more policy ARNs specified in `fleet.yaml` don't exist in the AWS account.
+
+**Resolution**:
+
+1. Verify the policy ARN is correct (check for typos):
+   ```bash
+   # For AWS-managed policies (policy/service-role/...)
+   aws iam get-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+
+   # For customer-managed policies
+   aws iam get-policy --policy-arn arn:aws:iam::<account-id>:policy/<policy-name>
+   ```
+
+2. If using a custom policy, ensure it exists in the same AWS account.
+
+3. Update `fleet.yaml` with the correct policy ARN.
+
+**3. IAM Role Already Exists (Created Manually or via CloudFormation)**
+
+**Warning Message**: `⚠ WARNING: IAM role already exists in AWS`
+
+**Root Cause**: An IAM role with the same name already exists but is not managed by ACK.
+
+**Behavior**: The hook will continue waiting. ACK IAM Controller will attempt to adopt the existing role and update it to match the desired state.
+
+**Resolution** (if adoption fails):
+
+1. Check if the existing role has the correct trust policy:
+   ```bash
+   aws iam get-role --role-name MCMAWSEBSCSIDriverRole --query 'Role.AssumeRolePolicyDocument'
+   ```
+
+2. If the trust policy is different, either:
+   - **Option A**: Delete the manually-created role and let ACK create it
+   - **Option B**: Manually update the trust policy to allow `pods.eks.amazonaws.com`
+
+**4. Reconciliation Timeout (5 Minutes)**
+
+**Error Message**: `ERROR: IAM Role was not reconciled after 60 attempts (5 minutes)`
+
+**Root Cause**: ACK IAM Controller is not reconciling the Role CRD (may be down, not watching CRDs, or experiencing AWS API throttling).
+
+**Resolution**:
+
+1. Check ACK IAM Controller pod status:
+   ```bash
+   kubectl get pods -n ack-system -l k8s-app=ack-iam-controller
+   kubectl logs -n ack-system -l k8s-app=ack-iam-controller --tail=100
+   ```
+
+2. Check if controller is reconciling CRDs:
+   ```bash
+   kubectl logs -n ack-system -l k8s-app=ack-iam-controller | grep "reconciling"
+   ```
+
+3. Check for AWS API throttling or rate limits in controller logs:
+   ```bash
+   kubectl logs -n ack-system -l k8s-app=ack-iam-controller | grep -i "throttl\|rate"
+   ```
+
+4. Restart the ACK IAM Controller if needed:
+   ```bash
+   kubectl delete pod -n ack-system -l k8s-app=ack-iam-controller
+   ```
+
+**5. Malformed Policy Document (Trust Policy or Inline Policy)**
+
+**Error Message**: `❌ ERROR: Trust policy or inline policy document is malformed`
+
+**Root Cause**: Invalid JSON syntax in `fleet.yaml` trust policy or inline policies.
+
+**Resolution**:
+
+1. Validate JSON syntax:
+   ```bash
+   # Extract policy from fleet.yaml and validate
+   yq '.helm.values.ack-iam-role-association.iamRole.trustPolicy' fleet.yaml | jq '.'
+   ```
+
+2. Common JSON errors:
+   - Missing closing braces `}`
+   - Trailing commas
+   - Unquoted keys
+   - Invalid escape characters
+
+3. Use a JSON validator before deploying:
+   ```bash
+   cat policy.json | jq '.'
+   ```
+
+#### Additional Debugging
+
+If the hook job failed and was cleaned up, check Helm release history:
+
+```bash
+# View release history
+helm history aws-ebs-csi-driver -n kube-system
+
+# Check for hook failures
+kubectl get events -n ack-system --sort-by='.lastTimestamp' | grep iam-role
+```
 
 ### Pod Identity Association Failures
 

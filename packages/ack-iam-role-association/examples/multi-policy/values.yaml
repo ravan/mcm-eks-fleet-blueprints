@@ -1,0 +1,98 @@
+# Example: IAM Role with Multiple Managed Policies and Tags
+#
+# This example demonstrates creating an IAM role with multiple AWS-managed
+# policies and comprehensive tagging for cost tracking and compliance.
+#
+# Use Case: AWS Load Balancer Controller requiring multiple AWS service
+# permissions (EC2, Elastic Load Balancing, WAF, Shield)
+#
+# Deploy:
+#   helm install my-alb-role packages/ack-iam-role-association/charts \
+#     -f packages/ack-iam-role-association/examples/multi-policy/values.yaml \
+#     -n ack-system
+
+enabled: true
+
+# Name of the controller/service using this role
+controllerName: aws-load-balancer-controller
+
+# IAM role configuration
+iamRole:
+  # Role name in AWS
+  name: MCMAWSLoadBalancerControllerRole
+
+  # IAM path for organizational structure
+  path: /controllers/
+
+  # Detailed description
+  description: "IAM role for AWS Load Balancer Controller with permissions for ALB/NLB management, WAF, and Shield"
+
+  # Trust policy for EKS Pod Identity
+  trustPolicy:
+    servicePrincipal: pods.eks.amazonaws.com
+    actions:
+      - sts:AssumeRole
+      - sts:TagSession
+
+  # Multiple AWS-managed policies
+  # NOTE: In a real deployment, you'd typically use a single custom policy
+  # This example shows how to attach multiple policies if needed
+  policies:
+    - arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
+    - arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess
+    # Add custom policies as needed:
+    # - arn:aws:iam::123456789012:policy/CustomALBPolicy
+
+  # No inline policies in this example
+  inlinePolicies: {}
+
+  # Session duration (4 hours for controller workloads)
+  maxSessionDuration: 14400
+
+  # Comprehensive tagging for governance and cost allocation
+  tags:
+    - key: managed-by
+      value: fleet
+    - key: component
+      value: aws-load-balancer-controller
+    - key: environment
+      value: production
+    - key: cost-center
+      value: platform-engineering
+    - key: compliance
+      value: sox
+    - key: team
+      value: platform
+    - key: project
+      value: multi-cluster-management
+    - key: backup
+      value: "true"
+
+# Helm hook configuration
+hook:
+  # Weight -10 ensures IAM role is created first
+  weight: -10
+
+  # Retry configuration
+  backoffLimit: 10
+
+  # Longer retention for production debugging
+  ttlSecondsAfterFinished: 172800  # 48 hours
+
+  # Use latest stable kubectl image
+  image: alpine/k8s:1.29.2
+
+  # Auto-generate service account
+  serviceAccountName: ""
+
+  # Cleanup hook
+  cleanup:
+    backoffLimit: 3
+    ttlSecondsAfterFinished: 300
+    image: alpine/k8s:1.29.2
+    serviceAccountName: ""
+
+# Note: This example demonstrates configuration options.
+# For AWS Load Balancer Controller, you should use a single custom inline policy
+# instead of multiple managed policies for least privilege access.
+# See: https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.6/deploy/installation/
