@@ -1,0 +1,113 @@
+questions:
+# Group 1: Cluster & AWS Configuration
+- variable: clusterName
+  type: string
+  required: true
+  label: EKS Cluster Name
+  description: "Name of the EKS cluster where this driver will be deployed"
+  group: "Cluster & AWS Configuration"
+
+- variable: awsRegion
+  type: string
+  required: true
+  label: AWS Region
+  description: "AWS region for API calls (e.g., us-west-2)"
+  group: "Cluster & AWS Configuration"
+
+- variable: awsAccountId
+  type: string
+  required: true
+  label: AWS Account ID
+  description: "12-digit AWS account ID (e.g., 123456789012)"
+  group: "Cluster & AWS Configuration"
+
+# Group 2: IAM Role Configuration
+- variable: ack-iam-role-association.enabled
+  type: boolean
+  default: true
+  label: Create IAM Role Automatically
+  description: "Create IAM role with EBS permissions via ACK IAM Controller"
+  group: "IAM Role Configuration"
+  show_subquestion_if: true
+  subquestions:
+    - variable: ack-iam-role-association.iamRole.name
+      type: string
+      default: "MCMAWSEBSCSIDriverRole"
+      required: true
+      label: IAM Role Name
+      description: "IAM role name for the EBS CSI Driver"
+
+    - variable: ack-iam-role-association.iamRole.description
+      type: string
+      default: "IAM role for AWS EBS CSI Driver with pod identity authentication"
+      label: IAM Role Description
+      description: "Description for the IAM role"
+
+# Group 3: Pod Identity Configuration
+- variable: ack-pod-identity-association.enabled
+  type: boolean
+  default: true
+  label: Enable Pod Identity Association
+  description: "Create pod identity association for the driver"
+  group: "Pod Identity Configuration"
+  show_subquestion_if: true
+  subquestions:
+    - variable: ack-pod-identity-association.podIdentity.name
+      type: string
+      default: "aws-ebs-csi-driver-pod-identity"
+      label: Pod Identity Association Name
+      description: "Name for the pod identity association resource"
+
+    - variable: ack-pod-identity-association.podIdentity.serviceAccountName
+      type: string
+      default: "ebs-csi-controller-sa"
+      label: Service Account Name
+      description: "Service account name for the driver controller"
+
+    - variable: ack-pod-identity-association.podIdentity.namespace
+      type: string
+      default: "kube-system"
+      label: Namespace
+      description: "Namespace where the driver is deployed"
+
+# Group 4: Controller Settings
+- variable: controller.replicaCount
+  type: int
+  default: 2
+  label: Controller Replicas
+  description: "Number of controller pod replicas (recommended 2 for HA)"
+  group: "Controller Settings"
+
+- variable: controller.serviceAccount.name
+  type: string
+  default: "ebs-csi-controller-sa"
+  label: Controller Service Account
+  description: "Service account name for the controller (must match pod identity)"
+  group: "Controller Settings"
+
+# Group 5: Storage Configuration
+- variable: storageClasses[0].name
+  type: string
+  default: "gp3"
+  label: Storage Class Name
+  description: "Name for the default storage class"
+  group: "Storage Configuration"
+
+- variable: storageClasses[0].parameters.type
+  type: enum
+  default: "gp3"
+  label: EBS Volume Type
+  description: "AWS EBS volume type"
+  options:
+    - "gp3"
+    - "gp2"
+    - "io1"
+    - "io2"
+  group: "Storage Configuration"
+
+- variable: storageClasses[0].parameters.encrypted
+  type: boolean
+  default: true
+  label: Encrypt Volumes
+  description: "Enable encryption for provisioned EBS volumes"
+  group: "Storage Configuration"

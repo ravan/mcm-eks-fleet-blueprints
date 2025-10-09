@@ -1,0 +1,84 @@
+questions:
+# Group 1: Cluster & AWS Configuration
+- variable: aws.region
+  type: string
+  required: true
+  label: AWS Region
+  description: "AWS region for API calls (e.g., us-west-2)"
+  group: "Cluster & AWS Configuration"
+
+- variable: awsAccountId
+  type: string
+  required: true
+  label: AWS Account ID
+  description: "12-digit AWS account ID (e.g., 123456789012)"
+  group: "Cluster & AWS Configuration"
+
+- variable: clusterName
+  type: string
+  required: true
+  label: EKS Cluster Name
+  description: "Name of the EKS cluster where this chart will be deployed"
+  group: "Cluster & AWS Configuration"
+
+# Group 2: IAM Role Configuration
+- variable: ackIamRoleName
+  type: string
+  default: "MCMACKIAMControllerRole"
+  required: true
+  label: IAM Role Name
+  description: "IAM role name for the IAM controller (must match CloudFormation stack)"
+  group: "IAM Role Configuration"
+
+# Group 3: Pod Identity Settings
+- variable: ack-pod-identity-association.podIdentity.enabled
+  type: boolean
+  default: true
+  label: Enable Pod Identity Association
+  description: "Create pod identity association for the controller"
+  group: "Pod Identity Settings"
+  show_subquestion_if: true
+  subquestions:
+    - variable: ack-pod-identity-association.podIdentity.name
+      type: string
+      default: "ack-iam-controller-pod-identity"
+      label: Pod Identity Association Name
+      description: "Name for the pod identity association resource"
+
+    - variable: ack-pod-identity-association.podIdentity.roleName
+      type: string
+      required: true
+      label: Pod Identity IAM Role Name
+      description: "IAM role name for pod identity (usually same as controller role)"
+
+    - variable: ack-pod-identity-association.podIdentity.serviceAccountName
+      type: string
+      default: "ack-iam-controller"
+      label: Service Account Name
+      description: "Service account name for the controller"
+
+    - variable: ack-pod-identity-association.podIdentity.namespace
+      type: string
+      default: "ack-system"
+      label: Namespace
+      description: "Namespace where the controller is deployed"
+
+# Group 4: Controller Settings
+- variable: deployment.replicas
+  type: int
+  default: 1
+  label: Controller Replicas
+  description: "Number of controller pod replicas"
+  group: "Controller Settings"
+
+- variable: log.level
+  type: enum
+  default: "info"
+  label: Log Level
+  description: "Logging verbosity level"
+  options:
+    - "debug"
+    - "info"
+    - "warn"
+    - "error"
+  group: "Controller Settings"

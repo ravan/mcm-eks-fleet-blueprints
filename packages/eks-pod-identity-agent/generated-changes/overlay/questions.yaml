@@ -1,0 +1,84 @@
+questions:
+# Group 1: Cluster Configuration
+- variable: clusterName
+  type: string
+  required: true
+  label: EKS Cluster Name
+  description: "Name of the EKS cluster"
+  group: "Cluster Configuration"
+
+- variable: env.AWS_REGION
+  type: string
+  required: true
+  label: AWS Region
+  description: "AWS region for API calls (e.g., us-west-2)"
+  group: "Cluster Configuration"
+
+# Group 2: DaemonSet Modes
+- variable: daemonsets.cloud.create
+  type: boolean
+  default: true
+  label: Enable Cloud DaemonSet
+  description: "Deploy DaemonSet for standard cloud nodes"
+  group: "DaemonSet Modes"
+
+- variable: daemonsets.hybrid.create
+  type: boolean
+  default: false
+  label: Enable Hybrid DaemonSet
+  description: "Deploy DaemonSet for hybrid nodes (on-premises)"
+  group: "DaemonSet Modes"
+  show_subquestion_if: true
+  subquestions:
+    - variable: daemonsets.hybrid.additionalArgs.--rotate-credentials
+      type: boolean
+      default: true
+      label: Rotate Credentials for Hybrid Nodes
+      description: "Enable credential rotation for hybrid nodes"
+
+- variable: daemonsets.hybrid-bottlerocket.create
+  type: boolean
+  default: false
+  label: Enable Bottlerocket Hybrid DaemonSet
+  description: "Deploy DaemonSet for Bottlerocket hybrid nodes"
+  group: "DaemonSet Modes"
+
+# Group 3: Image Configuration
+- variable: image.region
+  type: string
+  default: "us-west-2"
+  label: Image Region
+  description: "AWS region for ECR container image"
+  group: "Image Configuration"
+
+- variable: image.tag
+  type: string
+  default: "v0.1.34"
+  label: Image Tag
+  description: "Container image version tag"
+  group: "Image Configuration"
+
+# Group 4: Agent Settings
+- variable: agent.additionalArgs.-v
+  type: enum
+  default: "trace"
+  label: Log Verbosity
+  description: "Logging verbosity level"
+  options:
+    - "trace"
+    - "debug"
+    - "info"
+  group: "Agent Settings"
+
+- variable: priorityClassName
+  type: string
+  default: "system-node-critical"
+  label: Priority Class
+  description: "Pod priority class (do not change for production)"
+  group: "Agent Settings"
+
+- variable: resources.requests.memory
+  type: string
+  label: Memory Request
+  description: "Memory resource request (e.g., 128Mi)"
+  group: "Agent Settings"

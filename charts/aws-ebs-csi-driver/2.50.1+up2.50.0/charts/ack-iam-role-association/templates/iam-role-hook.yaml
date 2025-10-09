@@ -48,8 +48,44 @@ spec:
               echo "Max Session Duration: $MAX_SESSION_DURATION"
               echo ""
 
-              # Create the ACK IAM Role CRD
-              echo "Creating ACK IAM Role CRD..."
+              # Validate policy ARNs format (basic validation)
+              {{- if .Values.iamRole.policies }}
+              echo "Validating managed policy ARNs..."
+              {{- range .Values.iamRole.policies }}
+              POLICY_ARN="{{ . }}"
+              if [[ ! "$POLICY_ARN" =~ ^arn:aws:iam::(aws|[0-9]{12}):policy/.+ ]]; then
+                echo "ERROR: Invalid policy ARN format: $POLICY_ARN"
+                echo "Expected format: arn:aws:iam::aws:policy/* or arn:aws:iam::ACCOUNT-ID:policy/*"
+                exit 1
+              fi
+              echo "✓ Valid policy ARN: $POLICY_ARN"
+              {{- end }}
+              echo ""
+              {{- end }}
+
+              # Check if CRD already exists (idempotent operation)
+              echo "Checking if IAM Role CRD already exists..."
+              if kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE &> /dev/null; then
+                echo "ℹ IAM Role CRD already exists - validating configuration..."
+
+                # Get existing role ARN
+                EXISTING_ARN=$(kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE \
+                  -o jsonpath='{.status.ackResourceMetadata.arn}' 2>/dev/null || echo "")
+
+                if [ -n "$EXISTING_ARN" ]; then
+                  echo "✓ Existing IAM Role is already reconciled"
+                  echo "Role ARN: $EXISTING_ARN"
+                  echo "Updating CRD to ensure desired state matches..."
+                else
+                  echo "⚠ Existing CRD found but not yet reconciled - will update and wait for reconciliation"
+                fi
+              else
+                echo "IAM Role CRD does not exist - will create new"
+              fi
+              echo ""
+
+              # Create or update the ACK IAM Role CRD
+              echo "Applying ACK IAM Role CRD (create or update)..."
               cat <<'EOF' | kubectl apply -f -
               apiVersion: iam.services.k8s.aws/v1alpha1
               kind: Role
@@ -124,8 +160,77 @@ spec:
                   -o jsonpath='{.status.conditions[?(@.type=="ACK.ResourceSynced")].status}' 2>/dev/null || echo "")
 
                 if [ "$SYNCED_STATUS" = "False" ]; then
-                  echo "WARNING: ACK reconciliation failed. Checking conditions..."
-                  kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE -o jsonpath='{.status.conditions}' | jq '.' || true
+                  echo "⚠ WARNING: ACK reconciliation reported failure"
+                  echo ""
+
+                  # Get error message from status
+                  ERROR_MSG=$(kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE \
+                    -o jsonpath='{.status.conditions[?(@.type=="ACK.ResourceSynced")].message}' 2>/dev/null || echo "")
+
+                  if [ -n "$ERROR_MSG" ]; then
+                    echo "Error message from ACK controller:"
+                    echo "$ERROR_MSG"
+                    echo ""
+
+                    # Provide specific troubleshooting based on error message
+                    if echo "$ERROR_MSG" | grep -qi "AccessDenied\|UnauthorizedOperation\|not authorized"; then
+                      echo "❌ ERROR: ACK IAM Controller lacks IAM permissions"
+                      echo ""
+                      echo "The ACK IAM Controller does not have sufficient permissions to create/update IAM roles."
+                      echo ""
+                      echo "Required IAM permissions for ACK IAM Controller:"
+                      echo "  - iam:CreateRole"
+                      echo "  - iam:GetRole"
+                      echo "  - iam:UpdateRole"
+                      echo "  - iam:UpdateAssumeRolePolicy"
+                      echo "  - iam:AttachRolePolicy"
+                      echo "  - iam:DetachRolePolicy"
+                      echo "  - iam:TagRole"
+                      echo "  - iam:ListAttachedRolePolicies"
+                      echo ""
+                      echo "Check ACK IAM Controller's IAM role permissions in AWS console or via:"
+                      echo "  aws iam get-role-policy --role-name <ack-iam-controller-role> --policy-name <policy-name>"
+                      exit 1
+
+                    elif echo "$ERROR_MSG" | grep -qi "EntityAlreadyExists\|already exists"; then
+                      echo "⚠ WARNING: IAM role already exists in AWS"
+                      echo ""
+                      echo "The IAM role '$IAM_ROLE_NAME' already exists in AWS but may not be managed by ACK."
+                      echo "This can happen if:"
+                      echo "  1. Role was created manually or via CloudFormation"
+                      echo "  2. Role was created by another ACK controller instance"
+                      echo "  3. Previous deployment failed to clean up"
+                      echo ""
+                      echo "ACK will attempt to adopt and update the existing role."
+                      echo "Continuing to wait for reconciliation..."
+
+                    elif echo "$ERROR_MSG" | grep -qi "NoSuchEntity\|policy.*not found"; then
+                      echo "❌ ERROR: Managed policy ARN not found"
+                      echo ""
+                      echo "One or more policy ARNs specified do not exist in AWS:"
+                      {{- range .Values.iamRole.policies }}
+                      echo "  - {{ . }}"
+                      {{- end }}
+                      echo ""
+                      echo "Verify policy ARNs are correct and accessible in the target AWS account."
+                      exit 1
+
+                    elif echo "$ERROR_MSG" | grep -qi "MalformedPolicyDocument"; then
+                      echo "❌ ERROR: Trust policy or inline policy document is malformed"
+                      echo ""
+                      echo "The trust policy or one of the inline policies has invalid JSON syntax."
+                      echo "Check the assumeRolePolicyDocument and inlinePolicies in values.yaml"
+                      exit 1
+                    fi
+                  fi
+
+                  # Show full status conditions for debugging
+                  echo "Full CRD status conditions:"
+                  kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE \
+                    -o jsonpath='{.status.conditions}' | jq '.' 2>/dev/null || \
+                    kubectl get role.iam.services.k8s.aws $RESOURCE_NAME -n $NAMESPACE \
+                    -o jsonpath='{.status.conditions}'
+                  echo ""
                 fi
 
                 if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then

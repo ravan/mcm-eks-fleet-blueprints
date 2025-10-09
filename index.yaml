@@ -3,7 +3,7 @@ entries:
   aws-ebs-csi-driver:
   - apiVersion: v2
     appVersion: 1.50.0
-    created: "2025-10-09T13:40:28.615719+02:00"
+    created: "2025-10-09T15:53:27.425217+02:00"
     dependencies:
     - condition: ack-iam-role-association.enabled
       name: ack-iam-role-association
@@ -14,7 +14,7 @@ entries:
       repository: file://./charts/ack-pod-identity-association
       version: 1.0.0
     description: A Helm chart for AWS EBS CSI Driver
-    digest: 3b2233c11a5b056648bffa6521ad8213c7c5766fc15404353351389d3d3c14fc
+    digest: f1823a9aded8ab45208a62813a44c004998a19cf7d77392fc7b8a00bdeeebcab
     home: https://github.com/kubernetes-sigs/aws-ebs-csi-driver
     keywords:
     - aws
@@ -33,7 +33,7 @@ entries:
   eks-chart:
   - apiVersion: v1
     appVersion: 1.9.3
-    created: "2025-10-09T13:40:28.616465+02:00"
+    created: "2025-10-09T15:53:18.668006+02:00"
     dependencies:
     - condition: ack-eks-bootstrap.enabled
       name: ack-eks-bootstrap
@@ -41,7 +41,7 @@ entries:
       version: 1.0.0
     description: A Helm chart for the ACK service controller for Amazon Elastic Kubernetes
       Service (EKS)
-    digest: 87c8b829b9113cbfb1a92b9e3a2977a1a0203591510a56744a0b16f7b1d7ff40
+    digest: 1cd7b3ab785afcb341e59c0566ddce69bb6a5af0a828b028112fe989e98b5471
     home: https://github.com/aws-controllers-k8s/eks-controller
     icon: https://raw.githubusercontent.com/aws/eks-charts/master/docs/logo/aws.png
     keywords:
@@ -62,9 +62,9 @@ entries:
   eks-pod-identity-agent:
   - apiVersion: v2
     appVersion: 0.1.34
-    created: "2025-10-09T13:40:28.616864+02:00"
+    created: "2025-10-09T15:53:29.829241+02:00"
     description: A Helm chart for eks-pod-identity-agent
-    digest: f9d2051f0bac92bf47fa8666b73ed07bf3bc32824e73e77516efff01ee102523
+    digest: d83463860a3e5b680f4d9b076e56e7adbc069cfad37e4e18ebca2d2b75dff9cb
     home: https://github.com/aws/eks-pod-identity-agent
     icon: https://raw.githubusercontent.com/aws/eks-charts/master/docs/logo/aws.png
     keywords:
@@ -80,7 +80,7 @@ entries:
   iam-chart:
   - apiVersion: v1
     appVersion: 1.5.2
-    created: "2025-10-09T13:40:28.617523+02:00"
+    created: "2025-10-09T15:53:19.955289+02:00"
     dependencies:
     - condition: ack-pod-identity-association.enabled
       name: ack-pod-identity-association
@@ -88,7 +88,7 @@ entries:
       version: 1.0.0
     description: A Helm chart for the ACK service controller for AWS Identity & Access
       Management (IAM)
-    digest: a952d5542b367f1c5f0720f7d77692ee92f4a63ae6739b7fe1b08824bd31d101
+    digest: d488a0850154ad087ab614acf0335db355e72b2141758d3f3e10c373accd25d6
     home: https://github.com/aws-controllers-k8s/iam-controller
     icon: https://raw.githubusercontent.com/aws/eks-charts/master/docs/logo/aws.png
     keywords:

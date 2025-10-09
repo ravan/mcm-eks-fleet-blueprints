@@ -1,0 +1,75 @@
+questions:
+# Group 1: Cluster & AWS Configuration
+- variable: aws.region
+  type: string
+  required: true
+  label: AWS Region
+  description: "AWS region for API calls (e.g., us-west-2)"
+  group: "Cluster & AWS Configuration"
+
+- variable: clusterName
+  type: string
+  required: true
+  label: EKS Cluster Name
+  description: "Name of the EKS cluster where this chart will be deployed"
+  group: "Cluster & AWS Configuration"
+
+- variable: awsAccountId
+  type: string
+  required: true
+  label: AWS Account ID
+  description: "12-digit AWS account ID (e.g., 123456789012)"
+  group: "Cluster & AWS Configuration"
+
+# Group 2: IAM Role Configuration
+- variable: ackEksRoleName
+  type: string
+  default: "MCMACKEKSControllerRole"
+  required: true
+  label: IAM Role Name
+  description: "IAM role name for the EKS controller (must match CloudFormation stack)"
+  group: "IAM Role Configuration"
+
+# Group 3: Bootstrap Configuration
+- variable: ack-eks-bootstrap.clusterName
+  type: string
+  required: true
+  label: Bootstrap Cluster Name
+  description: "EKS cluster name for bootstrap job (usually same as main cluster name)"
+  group: "Bootstrap Configuration"
+
+- variable: ack-eks-bootstrap.awsRegion
+  type: string
+  required: true
+  label: Bootstrap AWS Region
+  description: "AWS region for bootstrap job (usually same as main region)"
+  group: "Bootstrap Configuration"
+
+- variable: ack-eks-bootstrap.awsAccountId
+  type: string
+  required: true
+  label: Bootstrap AWS Account ID
+  description: "AWS account ID for bootstrap job (usually same as main account ID)"
+  group: "Bootstrap Configuration"
+
+- variable: ack-eks-bootstrap.bootstrap.serviceAccount
+  type: string
+  default: "fleet-bootstrap"
+  label: Bootstrap Service Account
+  description: "Service account with existing pod identity for bootstrap job"
+  group: "Bootstrap Configuration"
+
+# Group 4: Controller Settings
+- variable: serviceAccount.name
+  type: string
+  default: "ack-eks-controller"
+  label: Controller Service Account
+  description: "Service account name for the controller"
+  group: "Controller Settings"
+
+- variable: deployment.replicas
+  type: int
+  default: 1
+  label: Controller Replicas
+  description: "Number of controller pod replicas"
+  group: "Controller Settings"
