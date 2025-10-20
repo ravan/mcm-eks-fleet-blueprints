@@ -38,6 +38,14 @@ targetCustomizations:
         #   - token: API key (mapped to stackstate.apiKey / STS_API_KEY)
 
         stackstate:
+          # Placeholder URL to satisfy Helm schema validation
+          # This value will be overridden by the external secret at runtime
+          url: "https://placeholder.example.com"
+
+          # Placeholder API key to satisfy template validation
+          # This value will be overridden by the external secret at runtime
+          apiKey: "placeholder-api-key"
+
           # Cluster name from Fleet label (used to construct secret name: <cluster-name>-observability)
           cluster:
             name: ${ index .ClusterLabels "cluster-name" }
@@ -47,7 +55,7 @@ targetCustomizations:
           # and reads values directly from the external secret
           observabilitySecret:
             enabled: true
-            namespace: "default"
+            namespace: "suse-observability"
             nameTemplate: "{{ .Values.stackstate.cluster.name }}-observability"
             urlKey: "endpoint"
             apiKeyKey: "token"
