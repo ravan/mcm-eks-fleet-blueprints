@@ -112,6 +112,37 @@ entries:
       catalog.cattle.io/release-name: suse-observability
     apiVersion: v2
     appVersion: 3.0.0
+    created: "2025-10-20T14:33:26.316917+02:00"
+    dependencies:
+    - alias: httpHeaderInjectorWebhook
+      condition: httpHeaderInjectorWebhook.enabled
+      name: http-header-injector
+      repository: file://./charts/http-header-injector
+      version: 0.0.16
+    - condition: kubernetes-rbac-agent.enabled
+      name: kubernetes-rbac-agent
+      repository: file://./charts/kubernetes-rbac-agent
+      version: 0.0.20
+    description: Helm chart for the SUSE observability Agent.
+    digest: 59b74334f4d9a5ea7e44a0529efecc8022a592462f4927f07cd82e36b0e7861d
+    home: https://github.com/StackVista/stackstate-agent
+    icon: https://raw.githubusercontent.com/StackVista/helm-charts/master/stable/suse-observability-agent/logo.svg
+    keywords:
+    - monitoring
+    - observability
+    - SUSE
+    maintainers:
+    - email: ops@stackstate.com
+      name: SUSE
+    name: suse-observability-agent
+    urls:
+    - assets/suse-observability-agent/suse-observability-agent-1.2.102+up1.2.1.tgz
+    version: 1.2.102+up1.2.1
+  - annotations:
+      catalog.cattle.io/display-name: SUSE Observability Agent
+      catalog.cattle.io/release-name: suse-observability
+    apiVersion: v2
+    appVersion: 3.0.0
     created: "2025-10-20T14:19:04.355672+02:00"
     dependencies:
     - alias: httpHeaderInjectorWebhook

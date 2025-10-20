@@ -13,7 +13,7 @@ helm:
   repo: https://ravan.github.io/mcm-eks-fleet-blueprints/
 
   # Chart version with package iteration (format: <package-version>+up<upstream-version>)
-  version: 1.2.101+up1.2.1
+  version: 1.2.102+up1.2.1
 
   # Helm release name in target clusters
   releaseName: suse-observability-agent
