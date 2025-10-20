@@ -1,0 +1,20 @@
+--- charts-original/values.yaml
++++ charts/values.yaml
+@@ -74,6 +74,17 @@
+     authToken: ""
+   # stackstate.url -- (string) **PROVIDE STACKSTATE URL HERE** URL of the StackState installation to receive data from the agent.
+   url:
++  observabilitySecret:
++    # stackstate.observabilitySecret.enabled -- Enable reading stackstate.url and stackstate.apiKey from an external Kubernetes secret. When enabled, the chart will not create internal ConfigMap/Secret for these values. Requires the external secret to exist before deployment and clusterAgent.collection.kubernetesResources.secrets must be enabled (default: true) to grant RBAC permissions for reading secrets cluster-wide.
++    enabled: false
++    # stackstate.observabilitySecret.namespace -- Namespace where the external observability secret is located.
++    namespace: "default"
++    # stackstate.observabilitySecret.nameTemplate -- Template for the external secret name. Supports templating (e.g., "{{ .Values.stackstate.cluster.name }}-observability")
++    nameTemplate: "{{ .Values.stackstate.cluster.name }}-observability"
++    # stackstate.observabilitySecret.urlKey -- Key in the external secret containing the StackState URL (maps to stackstate.url / STS_STS_URL)
++    urlKey: "endpoint"
++    # stackstate.observabilitySecret.apiKeyKey -- Key in the external secret containing the API key (maps to stackstate.apiKey / STS_API_KEY)
++    apiKeyKey: "token"
+ all:
+   image:
+     # all.image.registry -- The image registry to use.

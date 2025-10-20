@@ -1,0 +1,35 @@
+--- charts-original/templates/_helpers.tpl
++++ charts/templates/_helpers.tpl
+@@ -206,7 +206,10 @@
+ - name: STS_API_KEY
+   valueFrom:
+     secretKeyRef:
+-{{- if .Values.stackstate.manageOwnSecrets }}
++{{- if .Values.stackstate.observabilitySecret.enabled }}
++      name: {{ tpl .Values.stackstate.observabilitySecret.nameTemplate . | quote }}
++      key: {{ .Values.stackstate.observabilitySecret.apiKeyKey | quote }}
++{{- else if .Values.stackstate.manageOwnSecrets }}
+       name: {{ .Values.stackstate.customSecretName | quote }}
+       key: {{ .Values.stackstate.customApiKeySecretKey | quote }}
+ {{- else }}
+@@ -228,6 +231,20 @@
+ {{- end }}
+ {{- end -}}
+ 
++{{- define "stackstate-k8s-agent.urlEnv" -}}
++- name: STS_STS_URL
++  valueFrom:
++{{- if .Values.stackstate.observabilitySecret.enabled }}
++    secretKeyRef:
++      name: {{ tpl .Values.stackstate.observabilitySecret.nameTemplate . | quote }}
++      key: {{ .Values.stackstate.observabilitySecret.urlKey | quote }}
++{{- else }}
++    configMapKeyRef:
++      name: {{ include "stackstate-k8s-agent.url.configmap.internal.name" . | quote }}
++      key: STS_STS_URL
++{{- end }}
++{{- end -}}
++
+ {{- define "stackstate-k8s-agent.externalOrInternal" -}}
+ {{- if .external }}
+ {{- tpl .external . }}

@@ -1,0 +1,12 @@
+--- charts-original/templates/_container-agent.yaml
++++ charts/templates/_container-agent.yaml
+@@ -51,8 +51,7 @@
+       value: "false"
+     - name: STS_SKIP_SSL_VALIDATION
+       value: {{ or .Values.global.skipSslValidation .Values.nodeAgent.skipSslValidation | quote }}
+-    - name: STS_STS_URL
+-      value: {{ include "stackstate-k8s-agent.stackstate.url" . }}
++{{ include "stackstate-k8s-agent.urlEnv" . | indent 4 }}
+     {{- if .Values.nodeAgent.containerRuntime.customSocketPath }}
+     - name: STS_CRI_SOCKET_PATH
+       value: {{ .Values.nodeAgent.containerRuntime.customSocketPath }}

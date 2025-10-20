@@ -1,0 +1,12 @@
+--- charts-original/templates/checks-agent-deployment.yaml
++++ charts/templates/checks-agent-deployment.yaml
+@@ -76,8 +76,7 @@
+             value: "false"
+           - name: STS_SKIP_SSL_VALIDATION
+             value: {{ or .Values.global.skipSslValidation .Values.checksAgent.skipSslValidation | quote }}
+-          - name: STS_STS_URL
+-            value: {{ include "stackstate-k8s-agent.stackstate.url" . }}
++{{ include "stackstate-k8s-agent.urlEnv" . | indent 10 }}
+           {{- if .Values.global.proxy.url }}
+           - name: STS_PROXY_HTTPS
+             value: {{ .Values.global.proxy.url | quote }}

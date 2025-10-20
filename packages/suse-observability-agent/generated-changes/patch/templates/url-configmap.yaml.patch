@@ -1,0 +1,15 @@
+--- charts-original/templates/url-configmap.yaml
++++ charts/templates/url-configmap.yaml
+@@ -15,9 +15,11 @@
+   STS_STS_URL: {{ .Values.stackstate.url | quote }}
+ {{- end -}}
+ 
++{{- if not .Values.stackstate.observabilitySecret.enabled }}
+ {{- if .Values.stackstate.url }}
+ {{- $stackstateUrlInternalConfigMap := fromYaml (include "stackstate-k8s-agent.url.configmap.internal" .) -}}
+ {{- toYaml (merge $stackstateUrlInternalConfigMap) -}}
+ {{- else }}
+-{{- fail "Url not defined, either provide a SUSE Observability platform url through stackstate.url" }}
++{{- fail "Url not defined, either provide a SUSE Observability platform url through stackstate.url or enable stackstate.observabilitySecret.enabled" }}
++{{- end }}
+ {{- end }}

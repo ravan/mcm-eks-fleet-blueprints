@@ -1,0 +1,12 @@
+--- charts-original/templates/cluster-agent-deployment.yaml
++++ charts/templates/cluster-agent-deployment.yaml
+@@ -78,8 +78,7 @@
+             value: {{ .Values.clusterAgent.logLevel | quote }}
+           - name: STS_CLUSTER_AGENT_CMD_PORT
+             value: {{ .Values.clusterAgent.service.targetPort | quote }}
+-          - name: STS_STS_URL
+-            value: {{ include "stackstate-k8s-agent.stackstate.url" . }}
++{{ include "stackstate-k8s-agent.urlEnv" . | indent 10 }}
+           {{- if .Values.clusterAgent.config.configMap.maxDataSize }}
+           - name: STS_CONFIGMAP_MAX_DATASIZE
+             value: {{ .Values.clusterAgent.config.configMap.maxDataSize | quote }}

@@ -1,0 +1,116 @@
+# Fleet Bundle for SUSE Observability Agent
+# Purpose: GitOps deployment configuration for multi-cluster observability monitoring
+# Reads observability endpoint and token from cluster-specific secrets created by Rancher
+
+# Default namespace for agent components
+defaultNamespace: suse-observability
+
+helm:
+  # Helm chart name from repository
+  chart: suse-observability-agent
+
+  # Helm repository URL (GitHub Pages hosting built charts)
+  repo: https://ravan.github.io/mcm-eks-fleet-blueprints/
+
+  # Chart version with package iteration (format: <package-version>+up<upstream-version>)
+  version: 1.2.101+up1.2.1
+
+  # Helm release name in target clusters
+  releaseName: suse-observability-agent
+
+# Per-cluster customizations based on Fleet cluster labels
+targetCustomizations:
+  - name: observability-enabled-clusters
+    # Only deploy to clusters with this label
+    clusterSelector:
+      matchLabels:
+        observability-agent: "true"
+
+    helm:
+      values:
+        # =================================================================
+        # StackState Configuration - External Secret Mode
+        # =================================================================
+        # The chart reads endpoint and token from an external Kubernetes secret
+        # created by Rancher in the default namespace with format: <cluster-name>-observability
+        # Secret contains:
+        #   - endpoint: StackState URL (mapped to stackstate.url / STS_STS_URL)
+        #   - token: API key (mapped to stackstate.apiKey / STS_API_KEY)
+
+        stackstate:
+          # Cluster name from Fleet label (used to construct secret name: <cluster-name>-observability)
+          cluster:
+            name: ${ index .ClusterLabels "cluster-name" }
+
+          # Enable external observability secret mode
+          # When enabled, chart skips creating internal ConfigMap/Secret
+          # and reads values directly from the external secret
+          observabilitySecret:
+            enabled: true
+            namespace: "default"
+            nameTemplate: "{{ .Values.stackstate.cluster.name }}-observability"
+            urlKey: "endpoint"
+            apiKeyKey: "token"
+
+        # =================================================================
+        # Agent Configuration
+        # =================================================================
+        # Customize resource limits, log levels, and features as needed
+
+        # Node agent resources (runs on every node as DaemonSet)
+        nodeAgent:
+          containers:
+            agent:
+              resources:
+                limits:
+                  cpu: "270m"
+                  memory: "420Mi"
+                requests:
+                  cpu: "20m"
+                  memory: "180Mi"
+            processAgent:
+              resources:
+                limits:
+                  cpu: "125m"
+                  memory: "400Mi"
+                requests:
+                  cpu: "25m"
+                  memory: "128Mi"
+
+        # Cluster agent resources (cluster-wide monitoring)
+        clusterAgent:
+          resources:
+            limits:
+              cpu: "400m"
+              memory: "800Mi"
+            requests:
+              cpu: "70m"
+              memory: "512Mi"
+
+        # Logs agent resources (log collection DaemonSet)
+        logsAgent:
+          enabled: true
+          resources:
+            limits:
+              cpu: "1300m"
+              memory: "192Mi"
+            requests:
+              cpu: "20m"
+              memory: "100Mi"
+
+        # Checks agent resources (cluster checks)
+        checksAgent:
+          enabled: true
+          resources:
+            limits:
+              cpu: "400m"
+              memory: "600Mi"
+            requests:
+              cpu: "20m"
+              memory: "512Mi"
+
+# =================================================================
+# Fleet Bundle Dependencies
+# =================================================================
+# No dependencies - observability agent can deploy independently
+# The external secret must exist before deployment (created by Rancher)
