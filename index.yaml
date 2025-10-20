@@ -3,7 +3,7 @@ entries:
   aws-ebs-csi-driver:
   - apiVersion: v2
     appVersion: 1.50.0
-    created: "2025-10-09T15:53:27.425217+02:00"
+    created: "2025-10-20T13:17:32.309405+02:00"
     dependencies:
     - condition: ack-iam-role-association.enabled
       name: ack-iam-role-association
@@ -33,7 +33,7 @@ entries:
   eks-chart:
   - apiVersion: v1
     appVersion: 1.9.3
-    created: "2025-10-09T15:53:18.668006+02:00"
+    created: "2025-10-20T13:17:32.310174+02:00"
     dependencies:
     - condition: ack-eks-bootstrap.enabled
       name: ack-eks-bootstrap
@@ -62,7 +62,7 @@ entries:
   eks-pod-identity-agent:
   - apiVersion: v2
     appVersion: 0.1.34
-    created: "2025-10-09T15:53:29.829241+02:00"
+    created: "2025-10-20T13:17:32.310819+02:00"
     description: A Helm chart for eks-pod-identity-agent
     digest: d83463860a3e5b680f4d9b076e56e7adbc069cfad37e4e18ebca2d2b75dff9cb
     home: https://github.com/aws/eks-pod-identity-agent
@@ -80,7 +80,7 @@ entries:
   iam-chart:
   - apiVersion: v1
     appVersion: 1.5.2
-    created: "2025-10-09T15:53:19.955289+02:00"
+    created: "2025-10-20T13:17:32.312371+02:00"
     dependencies:
     - condition: ack-pod-identity-association.enabled
       name: ack-pod-identity-association
@@ -112,7 +112,7 @@ entries:
       catalog.cattle.io/release-name: suse-observability
     apiVersion: v2
     appVersion: 3.0.0
-    created: "2025-10-20T11:20:45.555177+02:00"
+    created: "2025-10-20T14:19:04.355672+02:00"
     dependencies:
     - alias: httpHeaderInjectorWebhook
       condition: httpHeaderInjectorWebhook.enabled
@@ -124,7 +124,7 @@ entries:
       repository: file://./charts/kubernetes-rbac-agent
       version: 0.0.20
     description: Helm chart for the SUSE observability Agent.
-    digest: 5d1806b21e7a97b420292ba39e79e5c438e46c8bd5bc9643d2f8ab145135f956
+    digest: 8387eb9af1fcea36a92c9c85716176e752cc9cf0c318228da54b4184df12da5d
     home: https://github.com/StackVista/stackstate-agent
     icon: https://raw.githubusercontent.com/StackVista/helm-charts/master/stable/suse-observability-agent/logo.svg
     keywords:
@@ -138,4 +138,4 @@ entries:
     urls:
     - assets/suse-observability-agent/suse-observability-agent-1.2.101+up1.2.1.tgz
     version: 1.2.101+up1.2.1
-generated: "2025-10-09T13:36:31.473337+02:00"
+generated: "2025-10-20T13:13:03.231438+02:00"

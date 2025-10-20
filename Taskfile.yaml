@@ -197,6 +197,7 @@ tasks:
       - PACKAGE=ack-iam-role-association ./bin/charts-build-scripts charts
       - PACKAGE=ack-pod-identity-association ./bin/charts-build-scripts charts
       - PACKAGE=aws-ebs-csi-driver ./bin/charts-build-scripts charts
+      - PACKAGE=suse-observability-agent ./bin/charts-build-scripts charts
       - PACKAGE=eks-pod-identity-agent ./bin/charts-build-scripts charts
       - echo "✓ All charts built and index.yaml updated"
  
