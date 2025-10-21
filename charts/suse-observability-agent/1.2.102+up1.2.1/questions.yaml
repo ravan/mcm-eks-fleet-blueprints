@@ -1,0 +1,185 @@
+questions:
+# Group 1: Cluster & Observability Configuration
+- variable: stackstate.cluster.name
+  type: string
+  required: true
+  label: Cluster Name
+  description: "EKS cluster name (used to construct external secret name: <cluster-name>-observability)"
+  group: "Cluster & Observability Configuration"
+
+- variable: stackstate.url
+  type: string
+  required: true
+  default: "https://placeholder.example.com"
+  label: SUSE Observability URL (Placeholder)
+  description: "Placeholder URL for schema validation. Actual URL will be read from external secret at runtime."
+  group: "Cluster & Observability Configuration"
+
+- variable: stackstate.apiKey
+  type: string
+  required: true
+  default: "placeholder-api-key"
+  label: API Key (Placeholder)
+  description: "Placeholder API key for template validation. Actual key will be read from external secret at runtime."
+  group: "Cluster & Observability Configuration"
+
+# Group 2: External Secret Configuration
+- variable: stackstate.observabilitySecret.enabled
+  type: boolean
+  default: true
+  label: Enable External Secret Mode
+  description: "Read observability URL and API key from external Kubernetes secret. When enabled, chart skips creating internal ConfigMap/Secret and uses the external secret instead."
+  group: "External Secret Configuration"
+  show_subquestion_if: true
+  subquestions:
+    - variable: stackstate.observabilitySecret.namespace
+      type: string
+      default: "suse-observability"
+      required: true
+      label: Secret Namespace
+      description: "Namespace where the external observability secret is located"
+
+    - variable: stackstate.observabilitySecret.nameTemplate
+      type: string
+      default: "{{ .Values.stackstate.cluster.name }}-observability"
+      required: true
+      label: Secret Name Template
+      description: "Template for external secret name. Supports Go templating (e.g., {{ .Values.stackstate.cluster.name }}-observability)"
+
+    - variable: stackstate.observabilitySecret.urlKey
+      type: string
+      default: "endpoint"
+      required: true
+      label: URL Key in Secret
+      description: "Key in the external secret containing the SUSE Observability URL (maps to stackstate.url / STS_STS_URL)"
+
+    - variable: stackstate.observabilitySecret.apiKeyKey
+      type: string
+      default: "token"
+      required: true
+      label: API Key in Secret
+      description: "Key in the external secret containing the API key (maps to stackstate.apiKey / STS_API_KEY)"
+
+# Group 3: Node Agent Settings
+- variable: nodeAgent.containers.agent.resources.limits.cpu
+  type: string
+  default: "270m"
+  label: Node Agent CPU Limit
+  description: "CPU limit for node agent (runs on every node as DaemonSet)"
+  group: "Node Agent Settings"
+
+- variable: nodeAgent.containers.agent.resources.limits.memory
+  type: string
+  default: "420Mi"
+  label: Node Agent Memory Limit
+  description: "Memory limit for node agent (runs on every node as DaemonSet)"
+  group: "Node Agent Settings"
+
+- variable: nodeAgent.containers.agent.resources.requests.cpu
+  type: string
+  default: "20m"
+  label: Node Agent CPU Request
+  description: "CPU request for node agent"
+  group: "Node Agent Settings"
+
+- variable: nodeAgent.containers.agent.resources.requests.memory
+  type: string
+  default: "180Mi"
+  label: Node Agent Memory Request
+  description: "Memory request for node agent"
+  group: "Node Agent Settings"
+
+# Group 4: Cluster Agent Settings
+- variable: clusterAgent.resources.limits.cpu
+  type: string
+  default: "400m"
+  label: Cluster Agent CPU Limit
+  description: "CPU limit for cluster agent (cluster-wide monitoring)"
+  group: "Cluster Agent Settings"
+
+- variable: clusterAgent.resources.limits.memory
+  type: string
+  default: "800Mi"
+  label: Cluster Agent Memory Limit
+  description: "Memory limit for cluster agent"
+  group: "Cluster Agent Settings"
+
+- variable: clusterAgent.resources.requests.cpu
+  type: string
+  default: "70m"
+  label: Cluster Agent CPU Request
+  description: "CPU request for cluster agent"
+  group: "Cluster Agent Settings"
+
+- variable: clusterAgent.resources.requests.memory
+  type: string
+  default: "512Mi"
+  label: Cluster Agent Memory Request
+  description: "Memory request for cluster agent"
+  group: "Cluster Agent Settings"
+
+# Group 5: Logs Agent Settings
+- variable: logsAgent.enabled
+  type: boolean
+  default: true
+  label: Enable Logs Agent
+  description: "Deploy logs agent for log collection (DaemonSet)"
+  group: "Logs Agent Settings"
+  show_subquestion_if: true
+  subquestions:
+    - variable: logsAgent.resources.limits.cpu
+      type: string
+      default: "1300m"
+      label: Logs Agent CPU Limit
+      description: "CPU limit for logs agent"
+
+    - variable: logsAgent.resources.limits.memory
+      type: string
+      default: "192Mi"
+      label: Logs Agent Memory Limit
+      description: "Memory limit for logs agent"
+
+    - variable: logsAgent.resources.requests.cpu
+      type: string
+      default: "20m"
+      label: Logs Agent CPU Request
+      description: "CPU request for logs agent"
+
+    - variable: logsAgent.resources.requests.memory
+      type: string
+      default: "100Mi"
+      label: Logs Agent Memory Request
+      description: "Memory request for logs agent"
+
+# Group 6: Checks Agent Settings
+- variable: checksAgent.enabled
+  type: boolean
+  default: true
+  label: Enable Checks Agent
+  description: "Deploy checks agent for cluster checks"
+  group: "Checks Agent Settings"
+  show_subquestion_if: true
+  subquestions:
+    - variable: checksAgent.resources.limits.cpu
+      type: string
+      default: "400m"
+      label: Checks Agent CPU Limit
+      description: "CPU limit for checks agent"
+
+    - variable: checksAgent.resources.limits.memory
+      type: string
+      default: "600Mi"
+      label: Checks Agent Memory Limit
+      description: "Memory limit for checks agent"
+
+    - variable: checksAgent.resources.requests.cpu
+      type: string
+      default: "20m"
+      label: Checks Agent CPU Request
+      description: "CPU request for checks agent"
+
+    - variable: checksAgent.resources.requests.memory
+      type: string
+      default: "512Mi"
+      label: Checks Agent Memory Request
+      description: "Memory request for checks agent"
